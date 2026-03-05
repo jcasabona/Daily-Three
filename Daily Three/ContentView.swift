@@ -63,6 +63,7 @@ struct ContentView: View {
                     }
             }
         }
+        .preferredColorScheme(preferredColorScheme)
         .onAppear {
             ensureSettings()
             requestNotificationsIfNeeded()
@@ -133,6 +134,10 @@ struct ContentView: View {
     private func currentTheme() -> ThemePalette {
         let option = settings?.theme ?? .sunrise
         return ThemePalette(option: option)
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        settings?.appearanceMode.colorScheme
     }
 
     private func writeSnapshotForToday() {
@@ -288,11 +293,14 @@ private struct SettingsView: View {
                     .pickerStyle(.inline)
                 }
 
-                Section("Widget Data") {
-                    Button("Reset Widget Snapshot") {
-                        SharedSnapshotStore.clear()
-                        WidgetCenter.shared.reloadAllTimelines()
+                Section("Appearance") {
+                    Picker("App Appearance", selection: $settings.appearanceMode) {
+                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName)
+                                .tag(mode)
+                        }
                     }
+                    .pickerStyle(.segmented)
                 }
             }
             .navigationTitle("Settings")
@@ -331,6 +339,11 @@ private struct OnboardingView: View {
                     Group {
                         SectionTitle(text: "Pick your theme")
                         ThemePicker(selection: $settings.theme, theme: theme)
+                    }
+
+                    Group {
+                        SectionTitle(text: "Appearance")
+                        AppearancePicker(selection: $settings.appearanceMode, theme: theme)
                     }
 
                     Group {
@@ -542,6 +555,31 @@ private struct ThemePicker: View {
     }
 }
 
+private struct AppearancePicker: View {
+    @Binding var selection: AppearanceMode
+    let theme: ThemePalette
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                Button(action: { selection = mode }) {
+                    Text(mode.displayName)
+                        .font(.system(.subheadline, design: .serif))
+                        .frame(maxWidth: .infinity)
+                        .padding(10)
+                        .background(theme.field)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(selection == mode ? theme.accent : theme.border, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
 private struct SectionTitle: View {
     let text: String
 
@@ -721,6 +759,29 @@ private extension ThemeOption {
     }
 }
 
+private extension AppearanceMode {
+    var displayName: String {
+        switch self {
+        case .system:
+            return "System"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
 
 #Preview {
     ContentView()

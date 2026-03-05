@@ -50,6 +50,12 @@ final class AppSettings {
     var middayTime: Date
     var eveningTime: Date
     var theme: ThemeOption
+    var appearanceModeRaw: String = AppearanceMode.system.rawValue
+
+    @Transient var appearanceMode: AppearanceMode {
+        get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
+        set { appearanceModeRaw = newValue.rawValue }
+    }
 
     init() {
         let calendar = Calendar.current
@@ -58,6 +64,7 @@ final class AppSettings {
         self.middayTime = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: today) ?? today
         self.eveningTime = calendar.date(bySettingHour: 17, minute: 0, second: 0, of: today) ?? today
         self.theme = .sunrise
+        self.appearanceModeRaw = AppearanceMode.system.rawValue
     }
 }
 
@@ -66,6 +73,12 @@ enum ThemeOption: String, CaseIterable, Codable {
     case ocean
     case forest
     case graphite
+}
+
+enum AppearanceMode: String, CaseIterable, Codable {
+    case system
+    case light
+    case dark
 }
 
 enum WidgetStoreConfiguration {
