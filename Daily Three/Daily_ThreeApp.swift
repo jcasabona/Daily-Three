@@ -7,14 +7,24 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 @main
 struct Daily_ThreeApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            DayEntry.self,
+            AppSettings.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let storeURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: SharedSnapshotStore.appGroupID)
+            .map { $0.appendingPathComponent("DailyThree.store") }
+        let modelConfiguration: ModelConfiguration
+        if let storeURL {
+            modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
+        } else {
+            modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        }
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
