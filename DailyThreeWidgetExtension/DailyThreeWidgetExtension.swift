@@ -9,11 +9,17 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 import SwiftData
+import Foundation
+
+#if os(iOS)
+import UIKit
+#endif
 
 struct DailySnapshot {
     let date: Date
     var tasks: [String]
     var completed: [Bool]
+    var theme: ThemeOption
 }
 
 struct DailySnapshotEntry: TimelineEntry {
@@ -43,9 +49,12 @@ struct DailySnapshotProvider: TimelineProvider {
             let todayKey = DayEntry.makeDateKey(for: Date())
             let descriptor = FetchDescriptor<DayEntry>(predicate: #Predicate { $0.dateKey == todayKey })
             if let entry = try context.fetch(descriptor).first {
+                let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
+                let theme = settings?.theme ?? .sunrise
                 return DailySnapshot(date: entry.date,
                                      tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
-                                     completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone])
+                                     completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],
+                                     theme: theme)
             }
         } catch {
             return nil
@@ -64,6 +73,8 @@ struct DailyThreeWidgetExtensionEntryView: View {
             SmallWidgetView(snapshot: entry.snapshot)
         case .systemMedium:
             MediumWidgetView(snapshot: entry.snapshot)
+        case .systemLarge:
+            LargeWidgetView(snapshot: entry.snapshot)
         case .accessoryCircular:
             AccessoryCircularView(snapshot: entry.snapshot)
         case .accessoryRectangular:
@@ -89,6 +100,7 @@ struct DailyThreeWidgetExtension: Widget {
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
+            .systemLarge,
             .accessoryCircular,
             .accessoryRectangular,
             .accessoryInline
@@ -121,7 +133,7 @@ private struct MediumWidgetView: View {
     let snapshot: DailySnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Daily Three")
                     .font(.headline)
@@ -137,7 +149,7 @@ private struct MediumWidgetView: View {
                          intent: ToggleTaskIntent(index: index))
             }
         }
-        .padding(12)
+        .padding(14)
     }
 
     private var completedCount: Int {
@@ -159,6 +171,45 @@ private struct AccessoryCircularView: View {
 
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
+    }
+}
+
+private struct LargeWidgetView: View {
+    let snapshot: DailySnapshot
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Daily Three")
+                    .font(.headline)
+                Spacer()
+                Text(snapshot.date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            ProgressRing(progress: progress, tint: themeAccentColor(snapshot.theme))
+                .frame(height: 165)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(0..<3, id: \.self) { index in
+                    TaskLine(text: snapshot.tasks[safe: index] ?? "",
+                             isDone: snapshot.completed[safe: index] ?? false,
+                             intent: ToggleTaskIntent(index: index))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+    }
+
+    private var progress: Double {
+        guard !snapshot.completed.isEmpty else { return 0 }
+        let completed = snapshot.completed.filter { $0 }.count
+        return Double(completed) / 3.0
     }
 }
 
@@ -212,12 +263,13 @@ private struct TaskLineContent: View {
     let isDone: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                .font(.caption2)
+                .font(.title3)
             Text(text.isEmpty ? "–" : text)
-                .font(.caption)
+                .font(.callout)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
         .foregroundStyle(isDone ? .primary : .secondary)
     }
@@ -236,9 +288,65 @@ private struct ProgressChip: View {
     }
 }
 
+private struct ProgressRing: View {
+    let progress: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(.secondary.opacity(0.25), lineWidth: 10)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text(percentText)
+                .font(.title2)
+        }
+        .accessibilityLabel("Completion")
+        .accessibilityValue(percentText)
+    }
+
+    private var percentText: String {
+        let value = Int(round(progress * 100))
+        return "\(value)%"
+    }
+}
+
+private func themeAccentColor(_ option: ThemeOption) -> Color {
+    #if os(iOS)
+    return Color(uiColor: UIColor { trait in
+        let isDark = trait.userInterfaceStyle == .dark
+        switch option {
+        case .sunrise:
+            return isDark
+            ? UIColor(red: 0.99, green: 0.67, blue: 0.44, alpha: 1)
+            : UIColor(red: 0.95, green: 0.48, blue: 0.30, alpha: 1)
+        case .ocean:
+            return isDark
+            ? UIColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
+            : UIColor(red: 0.16, green: 0.47, blue: 0.78, alpha: 1)
+        case .forest:
+            return isDark
+            ? UIColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
+            : UIColor(red: 0.18, green: 0.54, blue: 0.34, alpha: 1)
+        case .graphite:
+            return isDark
+            ? UIColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
+            : UIColor(red: 0.32, green: 0.33, blue: 0.36, alpha: 1)
+        }
+    })
+    #else
+    return .primary
+    #endif
+}
+
 private extension DailySnapshot {
     static var placeholder: DailySnapshot {
-        DailySnapshot(date: .now, tasks: ["Task 1", "Task 2", "Task 3"], completed: [false, true, false])
+        DailySnapshot(date: .now,
+                      tasks: ["Task 1", "Task 2", "Task 3"],
+                      completed: [false, true, false],
+                      theme: .sunrise)
     }
 }
 
@@ -284,9 +392,12 @@ struct ToggleTaskIntent: AppIntent {
 
             try context.save()
 
+            let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
+            let theme = settings?.theme ?? .sunrise
             return DailySnapshot(date: entry.date,
                                  tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
-                                 completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone])
+                                 completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],
+                                 theme: theme)
         } catch {
             return nil
         }
