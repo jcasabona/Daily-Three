@@ -126,15 +126,20 @@ private struct DailyThreeTasksWidgetEntryView: View {
     let entry: DailySnapshotEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Today’s Tasks")
                 .font(.headline)
             ForEach(0..<3, id: \.self) { index in
-                Text(taskText(at: index))
-                    .font(.caption)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Circle()
+                        .fill(.secondary)
+                        .frame(width: 4, height: 4)
+                    Text(taskText(at: index))
+                        .font(.caption.bold())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -221,14 +226,21 @@ private struct AccessoryCircularView: View {
     var body: some View {
         ZStack {
             Gauge(value: Double(completedCount), in: 0...3) {
-                Text("Daily")
+                Text("Tasks")
             }
             .gaugeStyle(.accessoryCircular)
+            Text("\(remainingCount)")
+                .font(.title2).bold()
+                .minimumScaleFactor(0.5)
         }
     }
 
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
+    }
+
+    private var remainingCount: Int {
+        max(0, 3 - completedCount)
     }
 }
 
@@ -276,14 +288,23 @@ private struct AccessoryRectangularView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Daily Three")
-                .font(.caption).bold()
             ForEach(0..<3, id: \.self) { index in
-                TaskLine(text: snapshot.tasks[safe: index] ?? "",
-                         isDone: snapshot.completed[safe: index] ?? false,
-                         intent: nil)
+                Text(taskText(at: index))
+                    .font(.caption2.bold())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if index < 2 {
+                    Rectangle()
+                        .fill(.secondary.opacity(0.35))
+                        .frame(height: 1)
+                }
             }
         }
+    }
+
+    private func taskText(at index: Int) -> String {
+        let task = snapshot.tasks[safe: index] ?? ""
+        return task.isEmpty ? "—" : task
     }
 }
 
