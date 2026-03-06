@@ -51,6 +51,7 @@ final class AppSettings {
     var eveningTime: Date
     var theme: ThemeOption
     var appearanceModeRaw: String = AppearanceMode.system.rawValue
+    var hasCompletedOnboarding: Bool?
 
     @Transient var appearanceMode: AppearanceMode {
         get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }

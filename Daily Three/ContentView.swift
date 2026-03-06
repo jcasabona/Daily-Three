@@ -98,6 +98,12 @@ struct ContentView: View {
         }
         #endif
         .task {
+            let completedOnboarding = settings?.hasCompletedOnboarding ?? false
+            if completedOnboarding {
+                showingOnboarding = false
+                return
+            }
+
             if let entry = todayEntry {
                 showingOnboarding = entry.taskOne.isEmpty && entry.taskTwo.isEmpty && entry.taskThree.isEmpty
             } else {
@@ -274,6 +280,15 @@ private struct SettingsView: View {
     @Bindable var settings: AppSettings
     let theme: ThemePalette
 
+    private var onboardingResetBinding: Binding<Bool> {
+        Binding(
+            get: { !(settings.hasCompletedOnboarding ?? false) },
+            set: { newValue in
+                settings.hasCompletedOnboarding = !newValue
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -301,6 +316,10 @@ private struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section("Onboarding") {
+                    Toggle("Reset onboarding", isOn: onboardingResetBinding)
                 }
             }
             .navigationTitle("Settings")
@@ -353,7 +372,11 @@ private struct OnboardingView: View {
                         TaskEditorRow(title: "Task 3", text: $entry.taskThree, theme: theme)
                     }
 
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        settings.hasCompletedOnboarding = true
+                        onSnapshotChange()
+                        dismiss()
+                    }) {
                         Text("Start Today")
                             .frame(maxWidth: .infinity)
                     }

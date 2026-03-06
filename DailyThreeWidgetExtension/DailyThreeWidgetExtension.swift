@@ -108,6 +108,45 @@ struct DailyThreeWidgetExtension: Widget {
     }
 }
 
+struct DailyThreeTasksWidget: Widget {
+    let kind: String = "DailyThreeTasksWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: DailySnapshotProvider()) { entry in
+            DailyThreeTasksWidgetEntryView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("Daily Three Tasks")
+        .description("See all three tasks at a glance.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+private struct DailyThreeTasksWidgetEntryView: View {
+    let entry: DailySnapshotEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Today’s Tasks")
+                .font(.headline)
+            ForEach(0..<3, id: \.self) { index in
+                Text(taskText(at: index))
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+    }
+
+    private func taskText(at index: Int) -> String {
+        let task = entry.snapshot.tasks[safe: index] ?? ""
+        return task.isEmpty ? "—" : task
+    }
+}
+
 private struct SmallWidgetView: View {
     let snapshot: DailySnapshot
 
@@ -119,13 +158,32 @@ private struct SmallWidgetView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            ProgressChip(completed: completedCount, total: 3)
+            Text(primaryText)
+                .font(.callout)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .foregroundStyle(.primary)
+            Text(secondaryText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(12)
     }
 
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
+    }
+
+    private var primaryText: String {
+        if let index = snapshot.completed.firstIndex(where: { !$0 }) {
+            let task = snapshot.tasks[safe: index] ?? ""
+            return task.isEmpty ? "Top task not set" : task
+        }
+        return "All tasks complete"
+    }
+
+    private var secondaryText: String {
+        "Completed: \(completedCount)/3"
     }
 }
 
