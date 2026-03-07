@@ -10,6 +10,7 @@
 		D8613C2F2F59F94D00DB7A70 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8613C2E2F59F94D00DB7A70 /* WidgetKit.framework */; };
 		D8613C312F59F94D00DB7A70 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8613C302F59F94D00DB7A70 /* SwiftUI.framework */; };
 		D8613C3E2F59F94E00DB7A70 /* DailyThreeWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D8613C2C2F59F94D00DB7A70 /* DailyThreeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D8855E042F5C58C800231A2B /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8855E032F5C58C800231A2B /* Shortcuts.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +42,7 @@
 		D8613C2C2F59F94D00DB7A70 /* DailyThreeWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DailyThreeWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8613C2E2F59F94D00DB7A70 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		D8613C302F59F94D00DB7A70 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		D8855E032F5C58C800231A2B /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -107,6 +109,7 @@
 				D8613C322F59F94D00DB7A70 /* DailyThreeWidgetExtension */,
 				D8613C2D2F59F94D00DB7A70 /* Frameworks */,
 				D81BFE522F59B052001ABEAC /* Products */,
+				D8855E032F5C58C800231A2B /* Shortcuts.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -237,6 +240,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D8855E042F5C58C800231A2B /* Shortcuts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
