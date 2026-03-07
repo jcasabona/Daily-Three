@@ -229,6 +229,7 @@ private struct AccessoryCircularView: View {
                 Text("Tasks")
             }
             .gaugeStyle(.accessoryCircular)
+            .tint(.primary)
             Text("\(remainingCount)")
                 .font(.title2).bold()
                 .minimumScaleFactor(0.5)
@@ -289,10 +290,15 @@ private struct AccessoryRectangularView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(0..<3, id: \.self) { index in
-                Text(taskText(at: index))
-                    .font(.caption2.bold())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 6) {
+                    Image(systemName: isDone(at: index) ? "checkmark.circle.fill" : "circle")
+                        .font(.caption2)
+                        .foregroundStyle(isDone(at: index) ? .primary : .secondary)
+                    Text(taskText(at: index))
+                        .font(.caption2.bold())
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 if index < 2 {
                     Rectangle()
                         .fill(.secondary.opacity(0.35))
@@ -305,6 +311,10 @@ private struct AccessoryRectangularView: View {
     private func taskText(at index: Int) -> String {
         let task = snapshot.tasks[safe: index] ?? ""
         return task.isEmpty ? "—" : task
+    }
+
+    private func isDone(at index: Int) -> Bool {
+        snapshot.completed[safe: index] ?? false
     }
 }
 
