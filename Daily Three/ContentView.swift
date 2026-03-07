@@ -302,8 +302,14 @@ private struct SettingsView: View {
                 Section("Theme") {
                     Picker("Theme", selection: $settings.theme) {
                         ForEach(ThemeOption.allCases, id: \.self) { option in
-                            Text(option.displayName)
-                                .tag(option)
+                            Label {
+                                Text(option.displayName)
+                            } icon: {
+                                Circle()
+                                    .fill(ThemePalette(option: option).accent)
+                                    .frame(width: 15, height: 15)
+                            }
+                            .tag(option)
                         }
                     }
                     .pickerStyle(.inline)
@@ -579,6 +585,9 @@ private struct ThemePicker: View {
             ForEach(ThemeOption.allCases, id: \.self) { option in
                 Button(action: { selection = option }) {
                     HStack {
+                        Circle()
+                            .fill(ThemePalette(option: option).accent)
+                            .frame(width: 18, height: 18)
                         Text(option.displayName)
                         Spacer()
                         if selection == option {
