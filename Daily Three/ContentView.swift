@@ -63,6 +63,7 @@ struct ContentView: View {
                     }
             }
         }
+        .tint(currentTheme().accent)
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             ensureSettings()
