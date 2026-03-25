@@ -382,9 +382,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Daily Three/Daily Three.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7L837UJ57L;
+				DEVELOPMENT_TEAM = P7GKU8Y7N9;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -404,8 +405,9 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ghm.Daily-Three";
+				PRODUCT_BUNDLE_IDENTIFIER = "goodhouse.Daily-Three";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -426,9 +428,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Daily Three/Daily Three.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7L837UJ57L;
+				DEVELOPMENT_TEAM = P7GKU8Y7N9;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -448,8 +451,9 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ghm.Daily-Three";
+				PRODUCT_BUNDLE_IDENTIFIER = "goodhouse.Daily-Three";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -472,7 +476,7 @@
 				CODE_SIGN_ENTITLEMENTS = DailyThreeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7L837UJ57L;
+				DEVELOPMENT_TEAM = P7GKU8Y7N9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DailyThreeWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DailyThreeWidget;
@@ -484,7 +488,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ghm.Daily-Three.DailyThreeWidgetExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = "goodhouse.Daily-Three.DailyThreeWidgetExtension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -505,7 +509,7 @@
 				CODE_SIGN_ENTITLEMENTS = DailyThreeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7L837UJ57L;
+				DEVELOPMENT_TEAM = P7GKU8Y7N9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DailyThreeWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DailyThreeWidget;
@@ -517,7 +521,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ghm.Daily-Three.DailyThreeWidgetExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = "goodhouse.Daily-Three.DailyThreeWidgetExtension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

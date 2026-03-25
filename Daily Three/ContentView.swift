@@ -19,6 +19,12 @@ private typealias PlatformColor = UIColor
 private typealias PlatformColor = NSColor
 #endif
 
+private enum AppTab: Hashable {
+    case today
+    case archive
+    case settings
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -26,6 +32,7 @@ struct ContentView: View {
     @Query private var settingsList: [AppSettings]
 
     @State private var showingOnboarding = false
+    @State private var selectedTab: AppTab = .today
 
     private var todayKey: String {
         DayEntry.makeDateKey(for: Date())
@@ -40,27 +47,31 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TodayView(entry: bindingForTodayEntry(), theme: currentTheme(), onSnapshotChange: writeSnapshotForToday)
                 .tabItem {
                     Label("Today", systemImage: "checklist")
                 }
+                .tag(AppTab.today)
 
             ArchiveView(entries: entries, theme: currentTheme())
                 .tabItem {
                     Label("Archive", systemImage: "calendar")
                 }
+                .tag(AppTab.archive)
 
             if let settings {
                 SettingsView(settings: settings, theme: currentTheme())
                     .tabItem {
                         Label("Settings", systemImage: "gearshape")
                     }
+                    .tag(AppTab.settings)
             } else {
                 ProgressView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape")
                     }
+                    .tag(AppTab.settings)
             }
         }
         .tint(currentTheme().accent)
@@ -69,6 +80,12 @@ struct ContentView: View {
             ensureSettings()
             requestNotificationsIfNeeded()
             writeSnapshotForToday()
+            selectedTab = .today
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                selectedTab = .today
+            }
         }
         .onChange(of: settings?.morningTime) { _, _ in
             scheduleNotificationsIfPossible()
@@ -135,7 +152,7 @@ struct ContentView: View {
 
     private func scheduleNotificationsIfPossible() {
         guard let settings else { return }
-        NotificationScheduler.shared.scheduleDailyNotifications(with: settings)
+        NotificationScheduler.shared.scheduleDailyNotifications(with: settings, entry: todayEntry)
     }
 
     private func currentTheme() -> ThemePalette {
@@ -758,12 +775,9 @@ private final class NotificationScheduler {
         }
     }
 
-    func scheduleDailyNotifications(with settings: AppSettings) {
-        let requests = [
-            NotificationRequest(identifier: "daily-three-morning",
-                                time: settings.morningTime,
-                                title: "Daily Three",
-                                body: "What are the 3 tasks you want to accomplish today?"),
+    func scheduleDailyNotifications(with settings: AppSettings, entry: DayEntry?) {
+        let shouldSkipMorning = entry?.hasAllTasksSet ?? false
+        var requests = [
             NotificationRequest(identifier: "daily-three-midday",
                                 time: settings.middayTime,
                                 title: "Daily Three",
@@ -773,6 +787,14 @@ private final class NotificationScheduler {
                                 title: "Daily Three",
                                 body: "Did you complete your tasks?")
         ]
+
+        if !shouldSkipMorning {
+            requests.insert(NotificationRequest(identifier: "daily-three-morning",
+                                                time: settings.morningTime,
+                                                title: "Daily Three",
+                                                body: "What are the 3 tasks you want to accomplish today?"),
+                            at: 0)
+        }
 
         center.removePendingNotificationRequests(withIdentifiers: requests.map { $0.identifier })
 
@@ -795,6 +817,18 @@ private struct NotificationRequest {
     let time: Date
     let title: String
     let body: String
+}
+
+private extension DayEntry {
+    var hasAllTasksSet: Bool {
+        !taskOne.trimmed.isEmpty && !taskTwo.trimmed.isEmpty && !taskThree.trimmed.isEmpty
+    }
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 private extension ThemeOption {
