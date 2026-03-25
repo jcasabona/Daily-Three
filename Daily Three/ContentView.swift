@@ -346,6 +346,12 @@ private struct SettingsView: View {
                 Section("Onboarding") {
                     Toggle("Reset onboarding", isOn: onboardingResetBinding)
                 }
+
+                Section("Credits") {
+                    NavigationLink("Credits") {
+                        CreditsView(theme: theme)
+                    }
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -357,6 +363,41 @@ private struct SettingsView: View {
             }
         }
         .tint(theme.accent)
+    }
+}
+
+private struct CreditsView: View {
+    let theme: ThemePalette
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Created by Joe Casabona with the help of Codex by OpenAI.")
+                    .font(.system(.body, design: .serif))
+
+                Link(destination: URL(string: "https://casabona.org/donate")!) {
+                    Text("Donate")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(theme.accent)
+
+                Link(destination: URL(string: "https://casabona.org/hire")!) {
+                    Text("Hire me")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(theme.accent)
+
+                Text(verbatim: "© \(Calendar.current.component(.year, from: Date())) Good House Media, LLC")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(20)
+        }
+        .background(theme.background)
+        .navigationTitle("Credits")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
