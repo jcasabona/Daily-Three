@@ -298,6 +298,10 @@ private struct ArchiveDetailView: View {
 private struct SettingsView: View {
     @Bindable var settings: AppSettings
     let theme: ThemePalette
+    @Query(sort: \DayEntry.date) private var entries: [DayEntry]
+    @State private var isExportingCSV = false
+    @State private var isPresentingShareSheet = false
+    @State private var exportURL: URL?
 
     private var onboardingResetBinding: Binding<Bool> {
         Binding(
@@ -347,6 +351,27 @@ private struct SettingsView: View {
                     Toggle("Reset onboarding", isOn: onboardingResetBinding)
                 }
 
+                Section("Export") {
+                    #if os(iOS)
+                    Button {
+                        startExport()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Label("Export CSV", systemImage: "square.and.arrow.up")
+                            if isExportingCSV {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    .disabled(isExportingCSV)
+                    #else
+                    ShareLink(item: makeCSVFileURL()) {
+                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                    }
+                    #endif
+                }
+
                 Section("Credits") {
                     NavigationLink("Credits") {
                         CreditsView(theme: theme)
@@ -363,8 +388,107 @@ private struct SettingsView: View {
             }
         }
         .tint(theme.accent)
+        #if os(iOS)
+        .sheet(isPresented: $isPresentingShareSheet, onDismiss: {
+            isExportingCSV = false
+            exportURL = nil
+        }) {
+            if let exportURL {
+                ShareSheet(activityItems: [exportURL])
+                    .onAppear {
+                        isExportingCSV = false
+                    }
+            } else {
+                ProgressView()
+            }
+        }
+        #endif
+    }
+
+    private func makeCSV() -> String {
+        var lines = ["date,task_one,task_two,task_three,task_one_done,task_two_done,task_three_done,progress_note,completion_note"]
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+
+        for entry in entries {
+            let row = [
+                formatter.string(from: entry.date),
+                entry.taskOne,
+                entry.taskTwo,
+                entry.taskThree,
+                entry.taskOneDone ? "true" : "false",
+                entry.taskTwoDone ? "true" : "false",
+                entry.taskThreeDone ? "true" : "false",
+                entry.progressNote,
+                entry.completionNote
+            ]
+            .map { escapeCSV($0) }
+            .joined(separator: ",")
+            lines.append(row)
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func makeCSVFileURL() -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let filename = "DailyThree-Export-\(formatter.string(from: Date())).csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            try makeCSV().write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            // Return the URL even if writing fails; share sheet will handle missing data.
+        }
+
+        return url
+    }
+
+    private func startExport() {
+        guard !isExportingCSV else { return }
+        isExportingCSV = true
+        exportURL = makeCSVFileURL()
+        isPresentingShareSheet = true
+    }
+
+    private func escapeCSV(_ value: String) -> String {
+        let needsQuotes = value.contains(",") || value.contains("\n") || value.contains("\"")
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return needsQuotes ? "\"\(escaped)\"" : escaped
     }
 }
+
+private struct CSVExport: Transferable {
+    let csv: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .commaSeparatedText) { export in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let filename = "DailyThree-Export-\(formatter.string(from: Date())).csv"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+            try export.csv.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url)
+        } importing: { received in
+            let data = try Data(contentsOf: received.file)
+            let csv = String(decoding: data, as: UTF8.self)
+            return CSVExport(csv: csv)
+        }
+    }
+}
+
+#if os(iOS)
+private struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 
 private struct CreditsView: View {
     let theme: ThemePalette
