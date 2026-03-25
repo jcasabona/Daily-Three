@@ -129,21 +129,31 @@ private struct DailyThreeTasksWidgetEntryView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Today’s Tasks")
                 .font(.headline)
-            ForEach(0..<3, id: \.self) { index in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Circle()
-                        .fill(.secondary)
-                        .frame(width: 4, height: 4)
-                    Text(taskText(at: index))
-                        .font(.caption.bold())
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            if hasAnyTasks {
+                ForEach(0..<3, id: \.self) { index in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Circle()
+                            .fill(.secondary)
+                            .frame(width: 4, height: 4)
+                        Text(taskText(at: index))
+                            .font(.caption.bold())
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
+            } else {
+                Text("Add your tasks")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
         .padding(12)
+    }
+
+    private var hasAnyTasks: Bool {
+        entry.snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     private func taskText(at index: Int) -> String {
@@ -163,20 +173,33 @@ private struct SmallWidgetView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Text(primaryText)
-                .font(.callout)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-                .foregroundStyle(.primary)
-            Text(secondaryText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if hasAnyTasks {
+                Text(primaryText)
+                    .font(.callout)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .foregroundStyle(.primary)
+                Text(secondaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Add your tasks")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                Text("Open Daily Three to get started")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(12)
     }
 
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
+    }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     private var primaryText: String {
@@ -201,15 +224,26 @@ private struct MediumWidgetView: View {
                 Text("Daily Three")
                     .font(.headline)
                 Spacer()
-                Text("\(completedCount)/3")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if hasAnyTasks {
+                    Text("\(completedCount)/3")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            ForEach(0..<3, id: \.self) { index in
-                TaskLine(text: snapshot.tasks[safe: index] ?? "",
-                         isDone: snapshot.completed[safe: index] ?? false,
-                         intent: ToggleTaskIntent(index: index))
+            if hasAnyTasks {
+                ForEach(0..<3, id: \.self) { index in
+                    TaskLine(text: snapshot.tasks[safe: index] ?? "",
+                             isDone: snapshot.completed[safe: index] ?? false,
+                             intent: ToggleTaskIntent(index: index))
+                }
+            } else {
+                Text("Add your tasks")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                Text("Open Daily Three to get started")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -218,6 +252,10 @@ private struct MediumWidgetView: View {
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
     }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
 }
 
 private struct AccessoryCircularView: View {
@@ -225,14 +263,20 @@ private struct AccessoryCircularView: View {
 
     var body: some View {
         ZStack {
-            Gauge(value: Double(completedCount), in: 0...3) {
-                Text("Tasks")
+            if hasAnyTasks {
+                Gauge(value: Double(completedCount), in: 0...3) {
+                    Text("Tasks")
+                }
+                .gaugeStyle(.accessoryCircular)
+                .tint(.primary)
+                Text("\(remainingCount)")
+                    .font(.title2).bold()
+                    .minimumScaleFactor(0.5)
+            } else {
+                Text("Add\ntasks")
+                    .font(.caption2)
+                    .multilineTextAlignment(.center)
             }
-            .gaugeStyle(.accessoryCircular)
-            .tint(.primary)
-            Text("\(remainingCount)")
-                .font(.title2).bold()
-                .minimumScaleFactor(0.5)
         }
     }
 
@@ -242,6 +286,10 @@ private struct AccessoryCircularView: View {
 
     private var remainingCount: Int {
         max(0, 3 - completedCount)
+    }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 
@@ -260,19 +308,30 @@ private struct LargeWidgetView: View {
             }
             .frame(maxWidth: .infinity)
 
-            ProgressRing(progress: progress, tint: themeAccentColor(snapshot.theme))
-                .frame(height: 165)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+            if hasAnyTasks {
+                ProgressRing(progress: progress, tint: themeAccentColor(snapshot.theme))
+                    .frame(height: 165)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
 
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(0..<3, id: \.self) { index in
-                    TaskLine(text: snapshot.tasks[safe: index] ?? "",
-                             isDone: snapshot.completed[safe: index] ?? false,
-                             intent: ToggleTaskIntent(index: index))
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(0..<3, id: \.self) { index in
+                        TaskLine(text: snapshot.tasks[safe: index] ?? "",
+                                 isDone: snapshot.completed[safe: index] ?? false,
+                                 intent: ToggleTaskIntent(index: index))
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Spacer(minLength: 20)
+                Text("Add your tasks")
+                    .font(.title3)
+                    .foregroundStyle(.primary)
+                Text("Open Daily Three to get started")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
     }
@@ -282,6 +341,10 @@ private struct LargeWidgetView: View {
         let completed = snapshot.completed.filter { $0 }.count
         return Double(completed) / 3.0
     }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
 }
 
 private struct AccessoryRectangularView: View {
@@ -289,21 +352,27 @@ private struct AccessoryRectangularView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(0..<3, id: \.self) { index in
-                HStack(spacing: 6) {
-                    Image(systemName: isDone(at: index) ? "checkmark.circle.fill" : "circle")
-                        .font(.caption2)
-                        .foregroundStyle(isDone(at: index) ? .primary : .secondary)
-                    Text(taskText(at: index))
-                        .font(.caption2.bold())
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            if hasAnyTasks {
+                ForEach(0..<3, id: \.self) { index in
+                    HStack(spacing: 6) {
+                        Image(systemName: isDone(at: index) ? "checkmark.circle.fill" : "circle")
+                            .font(.caption2)
+                            .foregroundStyle(isDone(at: index) ? .primary : .secondary)
+                        Text(taskText(at: index))
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    if index < 2 {
+                        Rectangle()
+                            .fill(.secondary.opacity(0.35))
+                            .frame(height: 1)
+                    }
                 }
-                if index < 2 {
-                    Rectangle()
-                        .fill(.secondary.opacity(0.35))
-                        .frame(height: 1)
-                }
+            } else {
+                Text("Add your tasks")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -316,17 +385,29 @@ private struct AccessoryRectangularView: View {
     private func isDone(at index: Int) -> Bool {
         snapshot.completed[safe: index] ?? false
     }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
 }
 
 private struct AccessoryInlineView: View {
     let snapshot: DailySnapshot
 
     var body: some View {
-        Text("Daily Three: \(completedCount)/3 done")
+        if hasAnyTasks {
+            Text("Daily Three: \(completedCount)/3 done")
+        } else {
+            Text("Daily Three: add tasks")
+        }
     }
 
     private var completedCount: Int {
         snapshot.completed.filter { $0 }.count
+    }
+
+    private var hasAnyTasks: Bool {
+        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 
