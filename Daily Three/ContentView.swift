@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 import WidgetKit
+import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit
 #endif
@@ -454,15 +455,16 @@ private struct TaskListCard: View {
     @Binding var entry: DayEntry
     let theme: ThemePalette
     var isEditable: Bool = true
+    @State private var draggedIndex: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Today’s Tasks")
                 .font(.system(.headline, design: .serif))
 
-            TaskRow(title: "Task 1", text: $entry.taskOne, isDone: $entry.taskOneDone, isEditable: isEditable, theme: theme)
-            TaskRow(title: "Task 2", text: $entry.taskTwo, isDone: $entry.taskTwoDone, isEditable: isEditable, theme: theme)
-            TaskRow(title: "Task 3", text: $entry.taskThree, isDone: $entry.taskThreeDone, isEditable: isEditable, theme: theme)
+            ForEach(0..<3, id: \.self) { index in
+                taskRowView(index: index)
+            }
         }
         .padding(16)
         .background(theme.card)
@@ -472,6 +474,78 @@ private struct TaskListCard: View {
                 .stroke(theme.border, lineWidth: 1)
         )
     }
+
+    @ViewBuilder
+    private func taskRowView(index: Int) -> some View {
+        let row = TaskRow(title: taskTitle(for: index),
+                          text: textBinding(for: index),
+                          isDone: doneBinding(for: index),
+                          isEditable: isEditable,
+                          theme: theme,
+                          showsDragHandle: isEditable)
+            .contentShape(Rectangle())
+
+        if isEditable {
+            row
+                .onDrag {
+                    draggedIndex = index
+                    return NSItemProvider(item: nil, typeIdentifier: UTType.data.identifier)
+                }
+                .onDrop(of: [UTType.data], delegate: TaskDropDelegate(destinationIndex: index,
+                                                                     draggedIndex: $draggedIndex,
+                                                                     entry: $entry))
+        } else {
+            row
+        }
+    }
+
+    private func taskTitle(for index: Int) -> String {
+        switch index {
+        case 0: return "Task 1"
+        case 1: return "Task 2"
+        default: return "Task 3"
+        }
+    }
+
+    private func textBinding(for index: Int) -> Binding<String> {
+        Binding(get: { taskText(for: index) }, set: { setTaskText(for: index, value: $0) })
+    }
+
+    private func doneBinding(for index: Int) -> Binding<Bool> {
+        Binding(get: { taskDone(for: index) }, set: { setTaskDone(for: index, value: $0) })
+    }
+
+    private func taskText(for index: Int) -> String {
+        switch index {
+        case 0: return entry.taskOne
+        case 1: return entry.taskTwo
+        default: return entry.taskThree
+        }
+    }
+
+    private func taskDone(for index: Int) -> Bool {
+        switch index {
+        case 0: return entry.taskOneDone
+        case 1: return entry.taskTwoDone
+        default: return entry.taskThreeDone
+        }
+    }
+
+    private func setTaskText(for index: Int, value: String) {
+        switch index {
+        case 0: entry.taskOne = value
+        case 1: entry.taskTwo = value
+        default: entry.taskThree = value
+        }
+    }
+
+    private func setTaskDone(for index: Int, value: Bool) {
+        switch index {
+        case 0: entry.taskOneDone = value
+        case 1: entry.taskTwoDone = value
+        default: entry.taskThreeDone = value
+        }
+    }
 }
 
 private struct TaskRow: View {
@@ -480,6 +554,7 @@ private struct TaskRow: View {
     @Binding var isDone: Bool
     let isEditable: Bool
     let theme: ThemePalette
+    var showsDragHandle: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -508,6 +583,67 @@ private struct TaskRow: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(theme.border, lineWidth: 1)
         )
+        .overlay(alignment: .trailing) {
+            if showsDragHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.muted)
+                    .padding(.trailing, 8)
+            }
+        }
+    }
+}
+
+private struct TaskDropDelegate: DropDelegate {
+    let destinationIndex: Int
+    @Binding var draggedIndex: Int?
+    @Binding var entry: DayEntry
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedIndex, draggedIndex != destinationIndex else { return }
+        swapTasks(from: draggedIndex, to: destinationIndex)
+        self.draggedIndex = destinationIndex
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedIndex = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    private func swapTasks(from: Int, to: Int) {
+        let source = taskPair(for: from)
+        let destination = taskPair(for: to)
+        setTask(for: from, text: destination.text, done: destination.done)
+        setTask(for: to, text: source.text, done: source.done)
+    }
+
+    private func taskPair(for index: Int) -> (text: String, done: Bool) {
+        switch index {
+        case 0:
+            return (entry.taskOne, entry.taskOneDone)
+        case 1:
+            return (entry.taskTwo, entry.taskTwoDone)
+        default:
+            return (entry.taskThree, entry.taskThreeDone)
+        }
+    }
+
+    private func setTask(for index: Int, text: String, done: Bool) {
+        switch index {
+        case 0:
+            entry.taskOne = text
+            entry.taskOneDone = done
+        case 1:
+            entry.taskTwo = text
+            entry.taskTwoDone = done
+        default:
+            entry.taskThree = text
+            entry.taskThreeDone = done
+        }
     }
 }
 
