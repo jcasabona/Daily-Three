@@ -49,7 +49,12 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            TodayView(entry: bindingForTodayEntry(), theme: currentTheme(), onSnapshotChange: writeSnapshotForToday)
+            TodayView(
+                entry: bindingForTodayEntry(),
+                theme: currentTheme(),
+                onSnapshotChange: writeSnapshotForToday,
+                onTasksSetChange: scheduleNotificationsIfPossible
+            )
                 .tabItem {
                     Label("Today", systemImage: "checklist")
                 }
@@ -180,6 +185,8 @@ private struct TodayView: View {
     @Binding var entry: DayEntry
     let theme: ThemePalette
     let onSnapshotChange: () -> Void
+    let onTasksSetChange: () -> Void
+    @State private var lastHasAllTasksSet: Bool?
 
     var body: some View {
         NavigationStack {
@@ -206,18 +213,37 @@ private struct TodayView: View {
                 }
             }
         }
-        .onChange(of: entry.taskOne) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.taskTwo) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.taskThree) { _, _ in onSnapshotChange() }
+        .onChange(of: entry.taskOne) { _, _ in
+            onSnapshotChange()
+            notifyTasksSetChangeIfNeeded()
+        }
+        .onChange(of: entry.taskTwo) { _, _ in
+            onSnapshotChange()
+            notifyTasksSetChangeIfNeeded()
+        }
+        .onChange(of: entry.taskThree) { _, _ in
+            onSnapshotChange()
+            notifyTasksSetChangeIfNeeded()
+        }
         .onChange(of: entry.taskOneDone) { _, _ in onSnapshotChange() }
         .onChange(of: entry.taskTwoDone) { _, _ in onSnapshotChange() }
         .onChange(of: entry.taskThreeDone) { _, _ in onSnapshotChange() }
         .onChange(of: entry.progressNote) { _, _ in onSnapshotChange() }
         .onChange(of: entry.completionNote) { _, _ in onSnapshotChange() }
+        .onAppear {
+            lastHasAllTasksSet = entry.hasAllTasksSet
+        }
     }
 
     private func formattedDate(_ date: Date) -> String {
         date.formatted(date: .complete, time: .omitted)
+    }
+
+    private func notifyTasksSetChangeIfNeeded() {
+        let current = entry.hasAllTasksSet
+        guard lastHasAllTasksSet != current else { return }
+        lastHasAllTasksSet = current
+        onTasksSetChange()
     }
 }
 
