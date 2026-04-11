@@ -51,11 +51,10 @@ struct GetTasksIntent: AppIntent {
         return rawTasks.enumerated().compactMap { index, task in
             let trimmed = task.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
-            if includeCompleted {
-                return trimmed
-            }
             let isDone = index < completed.count ? completed[index] : false
-            return isDone ? nil : trimmed
+            if !includeCompleted && isDone { return nil }
+            let status = isDone ? "✅" : "❌"
+            return "\(status) \(trimmed)"
         }
     }
 }
@@ -290,6 +289,95 @@ struct AddCompletionNotesIntent: AppIntent {
     }
 }
 
+enum TaskStatusFilter: String, AppEnum {
+    case all
+    case completed
+    case incomplete
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        "Task Status"
+    }
+
+    static var caseDisplayRepresentations: [TaskStatusFilter: DisplayRepresentation] {
+        [
+            .all: "All",
+            .completed: "Completed",
+            .incomplete: "Incomplete"
+        ]
+    }
+}
+
+struct GetTaskHistoryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Get Task History"
+    static var description = IntentDescription("Fetches tasks across a date range, filtered by completion status.")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "Status", default: .all)
+    var status: TaskStatusFilter
+
+    @Parameter(title: "Start Date")
+    var startDate: Date?
+
+    @Parameter(title: "End Date")
+    var endDate: Date?
+
+    init() {}
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let value = try await loadHistory()
+        return .result(value: value)
+    }
+
+    private func loadHistory() async throws -> String {
+        let calendar = Calendar.current
+        let end = endDate ?? Date()
+        let start = startDate ?? calendar.date(byAdding: .day, value: -7, to: end) ?? end
+
+        let startOfStart = calendar.startOfDay(for: start)
+        let endOfEnd = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: end) ?? end)
+
+        let container = try await WidgetStoreConfiguration.makeContainer()
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<DayEntry>(
+            predicate: #Predicate { $0.date >= startOfStart && $0.date < endOfEnd },
+            sortBy: [SortDescriptor(\.date, order: .forward)]
+        )
+        let entries = try context.fetch(descriptor)
+
+        var lines: [String] = []
+        for entry in entries {
+            let rawTasks = [entry.taskOne, entry.taskTwo, entry.taskThree]
+            let completed = [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone]
+
+            let filtered: [(String, Bool)] = rawTasks.enumerated().compactMap { index, task in
+                let trimmed = task.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return nil }
+                let isDone = index < completed.count ? completed[index] : false
+                switch status {
+                case .completed: return isDone ? (trimmed, isDone) : nil
+                case .incomplete: return isDone ? nil : (trimmed, isDone)
+                case .all: return (trimmed, isDone)
+                }
+            }
+
+            guard !filtered.isEmpty else { continue }
+
+            let dateText = entry.date.formatted(date: .abbreviated, time: .omitted)
+            lines.append(dateText)
+            for (task, isDone) in filtered {
+                let icon = isDone ? "✅" : "❌"
+                lines.append("\(icon) \(task)")
+            }
+            lines.append("")
+        }
+
+        if lines.isEmpty { return "No tasks found" }
+        // Remove trailing blank line
+        if lines.last?.isEmpty == true { lines.removeLast() }
+        return lines.joined(separator: "\n")
+    }
+}
+
 struct DailyThreeShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -351,6 +439,16 @@ struct DailyThreeShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Add Completion",
             systemImageName: "plus.bubble"
+        )
+        AppShortcut(
+            intent: GetTaskHistoryIntent(),
+            phrases: [
+                "Get task history in \(.applicationName)",
+                "Show my task history in \(.applicationName)",
+                "What did I do this week in \(.applicationName)"
+            ],
+            shortTitle: "Task History",
+            systemImageName: "clock.arrow.circlepath"
         )
     }
 }
