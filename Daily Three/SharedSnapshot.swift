@@ -14,7 +14,7 @@ struct SharedDailySnapshot: Codable {
 }
 
 enum SharedSnapshotStore {
-    static let appGroupID = "group.com.joecasabona.dailythree"
+    static let appGroupID = "group.goodhouse.dailythree"
     private static let snapshotKey = "daily-three-today-snapshot"
 
     static func save(_ snapshot: SharedDailySnapshot) {

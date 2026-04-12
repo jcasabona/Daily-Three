@@ -23,9 +23,17 @@ struct Daily_ThreeApp: App {
             .map { $0.appendingPathComponent("DailyThree.store") }
         let modelConfiguration: ModelConfiguration
         if let storeURL {
-            modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
+            modelConfiguration = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .automatic
+            )
         } else {
-            modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            modelConfiguration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic
+            )
         }
 
         do {

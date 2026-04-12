@@ -7,6 +7,8 @@
 
 import SwiftUI
 import SwiftData
+import CoreData
+import Combine
 import UserNotifications
 import WidgetKit
 import UniformTypeIdentifiers
@@ -122,6 +124,8 @@ struct ContentView: View {
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             ensureSettings()
+            DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
+            AppSettingsDeduplicator.deduplicateIfNeeded(context: modelContext)
             requestNotificationsIfNeeded()
             writeSnapshotForToday()
             if !router.hasPendingAction {
@@ -143,6 +147,11 @@ struct ContentView: View {
                 handleDeepLink(action)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange).receive(on: DispatchQueue.main)) { _ in
+            DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
+            AppSettingsDeduplicator.deduplicateIfNeeded(context: modelContext)
+            writeSnapshotForToday()
+        }
         .onChange(of: settings?.morningTime) { _, _ in
             scheduleNotificationsIfPossible()
         }
@@ -155,7 +164,7 @@ struct ContentView: View {
         .onChange(of: settingsList.count) { _, _ in
             scheduleNotificationsIfPossible()
         }
-        .onChange(of: settings?.theme) { _, _ in
+        .onChange(of: settings?.themeRaw) { _, _ in
             showingOnboarding = false
         }
         #if os(iOS)
