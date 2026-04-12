@@ -35,6 +35,12 @@ enum AppTab: Hashable {
     }
 }
 
+private enum DayEditingMode {
+    case today
+    case future
+    case readOnly
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -44,6 +50,7 @@ struct ContentView: View {
 
     @State private var showingOnboarding = false
     @State private var selectedTab: AppTab = .today
+    @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
 
     private var todayKey: String {
         DayEntry.makeDateKey(for: Date())
@@ -57,11 +64,32 @@ struct ContentView: View {
         settingsList.first
     }
 
+    private var editingMode: DayEditingMode {
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        if Calendar.current.isDate(selectedDate, inSameDayAs: todayStart) { return .today }
+        if selectedDate > todayStart { return .future }
+        return .readOnly
+    }
+
+    private var selectableDates: [Date] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return (0...7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+    }
+
+    private var archiveEntries: [DayEntry] {
+        let key = todayKey
+        return entries.filter { $0.dateKey <= key }
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             TodayView(
-                entry: bindingForTodayEntry(),
+                entry: bindingForEntry(on: selectedDate),
                 theme: currentTheme(),
+                editingMode: editingMode,
+                selectableDates: selectableDates,
+                selectedDate: $selectedDate,
                 onSnapshotChange: writeSnapshotForToday,
                 onTasksSetChange: scheduleNotificationsIfPossible
             )
@@ -70,7 +98,7 @@ struct ContentView: View {
                 }
                 .tag(AppTab.today)
 
-            ArchiveView(entries: entries, theme: currentTheme())
+            ArchiveView(entries: archiveEntries, theme: currentTheme())
                 .tabItem {
                     Label("Archive", systemImage: "calendar")
                 }
@@ -103,6 +131,10 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active && !router.recentlyHandled {
                 selectedTab = .today
+                let today = Calendar.current.startOfDay(for: Date())
+                if selectedDate < today {
+                    selectedDate = today
+                }
             }
         }
         .onOpenURL { url in
@@ -154,14 +186,18 @@ struct ContentView: View {
         }
     }
 
-    private func bindingForTodayEntry() -> Binding<DayEntry> {
-        if let existing = todayEntry {
+    private func bindingForEntry(on date: Date) -> Binding<DayEntry> {
+        let key = DayEntry.makeDateKey(for: date)
+        if let existing = entries.first(where: { $0.dateKey == key }) {
             return Binding(get: { existing }, set: { _ in })
         }
-
-        let newEntry = DayEntry(date: Date())
+        let newEntry = DayEntry(date: date)
         modelContext.insert(newEntry)
         return Binding(get: { newEntry }, set: { _ in })
+    }
+
+    private func bindingForTodayEntry() -> Binding<DayEntry> {
+        bindingForEntry(on: Date())
     }
 
     private func ensureSettings() {
@@ -281,21 +317,40 @@ struct ContentView: View {
 private struct TodayView: View {
     @Binding var entry: DayEntry
     let theme: ThemePalette
+    let editingMode: DayEditingMode
+    let selectableDates: [Date]
+    @Binding var selectedDate: Date
     let onSnapshotChange: () -> Void
     let onTasksSetChange: () -> Void
     @State private var lastHasAllTasksSet: Bool?
+
+    private var subtitle: String {
+        editingMode == .today ? "Your three tasks" : "Plan ahead"
+    }
+
+    private var showCheckboxes: Bool {
+        editingMode == .today
+    }
+
+    private var showDragHandles: Bool {
+        editingMode == .today
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HeaderCard(title: formattedDate(entry.date), subtitle: "Your three tasks", theme: theme)
+                    DateSelectorBar(dates: selectableDates, selectedDate: $selectedDate, theme: theme)
 
-                    TaskListCard(entry: $entry, theme: theme)
+                    HeaderCard(title: formattedDate(entry.date), subtitle: subtitle, theme: theme)
 
-                    NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
+                    TaskListCard(entry: $entry, theme: theme, isEditable: editingMode != .readOnly, showCheckboxes: showCheckboxes, showDragHandles: showDragHandles)
 
-                    NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+                    if editingMode == .today {
+                        NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
+
+                        NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
@@ -312,21 +367,31 @@ private struct TodayView: View {
         }
         .onChange(of: entry.taskOne) { _, _ in
             onSnapshotChange()
-            notifyTasksSetChangeIfNeeded()
+            if editingMode == .today { notifyTasksSetChangeIfNeeded() }
         }
         .onChange(of: entry.taskTwo) { _, _ in
             onSnapshotChange()
-            notifyTasksSetChangeIfNeeded()
+            if editingMode == .today { notifyTasksSetChangeIfNeeded() }
         }
         .onChange(of: entry.taskThree) { _, _ in
             onSnapshotChange()
-            notifyTasksSetChangeIfNeeded()
+            if editingMode == .today { notifyTasksSetChangeIfNeeded() }
         }
-        .onChange(of: entry.taskOneDone) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.taskTwoDone) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.taskThreeDone) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.progressNote) { _, _ in onSnapshotChange() }
-        .onChange(of: entry.completionNote) { _, _ in onSnapshotChange() }
+        .onChange(of: entry.taskOneDone) { _, _ in
+            if editingMode == .today { onSnapshotChange() }
+        }
+        .onChange(of: entry.taskTwoDone) { _, _ in
+            if editingMode == .today { onSnapshotChange() }
+        }
+        .onChange(of: entry.taskThreeDone) { _, _ in
+            if editingMode == .today { onSnapshotChange() }
+        }
+        .onChange(of: entry.progressNote) { _, _ in
+            if editingMode == .today { onSnapshotChange() }
+        }
+        .onChange(of: entry.completionNote) { _, _ in
+            if editingMode == .today { onSnapshotChange() }
+        }
         .onAppear {
             lastHasAllTasksSet = entry.hasAllTasksSet
         }
@@ -743,11 +808,17 @@ private struct TaskListCard: View {
     @Binding var entry: DayEntry
     let theme: ThemePalette
     var isEditable: Bool = true
+    var showCheckboxes: Bool = true
+    var showDragHandles: Bool = true
     @State private var draggedIndex: Int?
+
+    private var cardTitle: String {
+        showCheckboxes ? "Today's Tasks" : "Tasks"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Today’s Tasks")
+            Text(cardTitle)
                 .font(.system(.headline, design: .serif))
 
             ForEach(0..<3, id: \.self) { index in
@@ -770,10 +841,11 @@ private struct TaskListCard: View {
                           isDone: doneBinding(for: index),
                           isEditable: isEditable,
                           theme: theme,
-                          showsDragHandle: isEditable)
+                          showsDragHandle: showDragHandles,
+                          showCheckbox: showCheckboxes)
             .contentShape(Rectangle())
 
-        if isEditable {
+        if showDragHandles {
             row
                 .onDrag {
                     draggedIndex = index
@@ -843,16 +915,19 @@ private struct TaskRow: View {
     let isEditable: Bool
     let theme: ThemePalette
     var showsDragHandle: Bool = false
+    var showCheckbox: Bool = true
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: { isDone.toggle() }) {
-                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isDone ? theme.accent : theme.muted)
+            if showCheckbox {
+                Button(action: { isDone.toggle() }) {
+                    Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isDone ? theme.accent : theme.muted)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEditable)
             }
-            .buttonStyle(.plain)
-            .disabled(!isEditable)
 
             if isEditable {
                 TextField(title, text: $text)
@@ -1081,6 +1156,61 @@ private struct SectionTitle: View {
         Text(text)
             .font(.system(.headline, design: .serif))
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct DateSelectorBar: View {
+    let dates: [Date]
+    @Binding var selectedDate: Date
+    let theme: ThemePalette
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(dates, id: \.self) { date in
+                    DateChip(date: date, isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate), isToday: Calendar.current.isDateInToday(date), theme: theme)
+                        .onTapGesture { selectedDate = date }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.horizontal, -16)
+    }
+}
+
+private struct DateChip: View {
+    let date: Date
+    let isSelected: Bool
+    let isToday: Bool
+    let theme: ThemePalette
+
+    private var weekday: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date).uppercased()
+    }
+
+    private var dayNumber: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(weekday)
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+            Text(dayNumber)
+                .font(.system(size: 16, weight: .bold, design: .serif))
+        }
+        .frame(width: 44, height: 52)
+        .background(isSelected ? theme.accent : theme.card)
+        .foregroundStyle(isSelected ? .white : .primary)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isToday && !isSelected ? theme.accent : theme.border, lineWidth: isToday && !isSelected ? 2 : 1)
+        )
     }
 }
 
