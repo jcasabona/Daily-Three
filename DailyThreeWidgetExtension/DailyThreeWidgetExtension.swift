@@ -13,6 +13,8 @@ import Foundation
 
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 struct DailySnapshot {
@@ -75,12 +77,14 @@ struct DailyThreeWidgetExtensionEntryView: View {
             MediumWidgetView(snapshot: entry.snapshot)
         case .systemLarge:
             LargeWidgetView(snapshot: entry.snapshot)
+        #if os(iOS)
         case .accessoryCircular:
             AccessoryCircularView(snapshot: entry.snapshot)
         case .accessoryRectangular:
             AccessoryRectangularView(snapshot: entry.snapshot)
         case .accessoryInline:
             AccessoryInlineView(snapshot: entry.snapshot)
+        #endif
         default:
             MediumWidgetView(snapshot: entry.snapshot)
         }
@@ -97,14 +101,21 @@ struct DailyThreeWidgetExtension: Widget {
         }
         .configurationDisplayName("Daily Three")
         .description("See today’s three tasks and progress.")
-        .supportedFamilies([
-            .systemSmall,
-            .systemMedium,
-            .systemLarge,
-            .accessoryCircular,
-            .accessoryRectangular,
-            .accessoryInline
-        ])
+        .supportedFamilies({
+            var families: [WidgetFamily] = [
+                .systemSmall,
+                .systemMedium,
+                .systemLarge,
+            ]
+            #if os(iOS)
+            families += [
+                .accessoryCircular,
+                .accessoryRectangular,
+                .accessoryInline,
+            ]
+            #endif
+            return families
+        }())
     }
 }
 
@@ -258,6 +269,7 @@ private struct MediumWidgetView: View {
     }
 }
 
+#if os(iOS)
 private struct AccessoryCircularView: View {
     let snapshot: DailySnapshot
 
@@ -292,6 +304,7 @@ private struct AccessoryCircularView: View {
         snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
+#endif
 
 private struct LargeWidgetView: View {
     let snapshot: DailySnapshot
@@ -347,6 +360,7 @@ private struct LargeWidgetView: View {
     }
 }
 
+#if os(iOS)
 private struct AccessoryRectangularView: View {
     let snapshot: DailySnapshot
 
@@ -410,6 +424,7 @@ private struct AccessoryInlineView: View {
         snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
+#endif
 
 private struct TaskLine: View {
     let text: String
@@ -417,7 +432,7 @@ private struct TaskLine: View {
     let intent: ToggleTaskIntent?
 
     var body: some View {
-        if #available(iOS 17.0, *), let intent {
+        if #available(iOS 17.0, macOS 14.0, *), let intent {
             Button(intent: intent) {
                 TaskLineContent(text: text, isDone: isDone)
             }
@@ -507,7 +522,27 @@ private func themeAccentColor(_ option: ThemeOption) -> Color {
         }
     })
     #else
-    return .primary
+    return Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        switch option {
+        case .sunrise:
+            return isDark
+            ? NSColor(red: 0.99, green: 0.67, blue: 0.44, alpha: 1)
+            : NSColor(red: 0.95, green: 0.48, blue: 0.30, alpha: 1)
+        case .ocean:
+            return isDark
+            ? NSColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
+            : NSColor(red: 0.16, green: 0.47, blue: 0.78, alpha: 1)
+        case .forest:
+            return isDark
+            ? NSColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
+            : NSColor(red: 0.18, green: 0.54, blue: 0.34, alpha: 1)
+        case .graphite:
+            return isDark
+            ? NSColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
+            : NSColor(red: 0.32, green: 0.33, blue: 0.36, alpha: 1)
+        }
+    })
     #endif
 }
 

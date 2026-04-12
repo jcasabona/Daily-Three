@@ -47,7 +47,13 @@ struct Daily_ThreeApp: App {
         WindowGroup {
             ContentView()
                 .environment(router)
+                #if os(macOS)
+                .frame(minWidth: 500, minHeight: 600)
+                #endif
         }
         .modelContainer(sharedModelContainer)
+        #if os(macOS)
+        .defaultSize(width: 700, height: 800)
+        #endif
     }
 }

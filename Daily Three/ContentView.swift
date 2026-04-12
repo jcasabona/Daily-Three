@@ -22,6 +22,17 @@ private typealias PlatformColor = UIColor
 private typealias PlatformColor = NSColor
 #endif
 
+extension View {
+    @ViewBuilder
+    func inlineNavigationBarTitle() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
+}
+
 enum AppTab: Hashable {
     case today
     case archive
@@ -84,7 +95,52 @@ struct ContentView: View {
         return entries.filter { $0.dateKey <= key }
     }
 
-    var body: some View {
+    #if os(macOS)
+    private var mainContainer: some View {
+        NavigationStack {
+            Group {
+                switch selectedTab {
+                case .today:
+                    TodayView(
+                        entry: bindingForEntry(on: selectedDate),
+                        theme: currentTheme(),
+                        editingMode: editingMode,
+                        selectableDates: selectableDates,
+                        selectedDate: $selectedDate,
+                        onSnapshotChange: writeSnapshotForToday,
+                        onTasksSetChange: scheduleNotificationsIfPossible
+                    )
+                case .archive:
+                    ArchiveView(entries: archiveEntries, theme: currentTheme())
+                case .settings:
+                    if let settings {
+                        SettingsView(settings: settings, theme: currentTheme())
+                    } else {
+                        ProgressView()
+                    }
+                }
+            }
+            .toolbar(removing: .title)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Text("Daily Three")
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                }
+                ToolbarItem(placement: .principal) {
+                    Picker("", selection: $selectedTab) {
+                        Text("Today").tag(AppTab.today)
+                        Text("Archive").tag(AppTab.archive)
+                        Text("Settings").tag(AppTab.settings)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 250)
+                }
+            }
+        }
+        .tint(currentTheme().accent)
+    }
+    #else
+    private var mainContainer: some View {
         TabView(selection: $selectedTab) {
             TodayView(
                 entry: bindingForEntry(on: selectedDate),
@@ -121,6 +177,11 @@ struct ContentView: View {
             }
         }
         .tint(currentTheme().accent)
+    }
+    #endif
+
+    var body: some View {
+        mainContainer
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             ensureSettings()
@@ -177,6 +238,8 @@ struct ContentView: View {
         .sheet(isPresented: $showingOnboarding) {
             if let settings {
                 OnboardingView(settings: settings, entry: bindingForTodayEntry(), theme: currentTheme(), onSnapshotChange: writeSnapshotForToday)
+            } else {
+                ProgressView()
             }
         }
         #endif
@@ -345,35 +408,53 @@ private struct TodayView: View {
         editingMode == .today
     }
 
-    var body: some View {
+    private var scrollContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                DateSelectorBar(dates: selectableDates, selectedDate: $selectedDate, theme: theme)
+
+                HeaderCard(title: formattedDate(entry.date), subtitle: subtitle, theme: theme)
+
+                TaskListCard(entry: $entry, theme: theme, isEditable: editingMode != .readOnly, showCheckboxes: showCheckboxes, showDragHandles: showDragHandles)
+
+                if editingMode == .today {
+                    NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
+
+                    NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 32)
+        }
+    }
+
+    #if os(iOS)
+    private var viewContainer: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    DateSelectorBar(dates: selectableDates, selectedDate: $selectedDate, theme: theme)
-
-                    HeaderCard(title: formattedDate(entry.date), subtitle: subtitle, theme: theme)
-
-                    TaskListCard(entry: $entry, theme: theme, isEditable: editingMode != .readOnly, showCheckboxes: showCheckboxes, showDragHandles: showDragHandles)
-
-                    if editingMode == .today {
-                        NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
-
-                        NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+            scrollContent
+                .background(theme.background)
+                .navigationTitle("Daily Three")
+                .inlineNavigationBarTitle()
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Daily Three")
+                            .font(.system(size: 20, weight: .semibold, design: .serif))
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 32)
-            }
-            .background(theme.background)
-            .navigationTitle("Daily Three")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Daily Three")
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                }
-            }
         }
+    }
+    #else
+    private var viewContainer: some View {
+        scrollContent
+            .padding(.top, 12)
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
+            .background(theme.background)
+    }
+    #endif
+
+    var body: some View {
+        viewContainer
         .onChange(of: entry.taskOne) { _, _ in
             onSnapshotChange()
             if editingMode == .today { notifyTasksSetChangeIfNeeded() }
@@ -422,39 +503,48 @@ private struct ArchiveView: View {
     let entries: [DayEntry]
     let theme: ThemePalette
 
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(entries) { entry in
-                    NavigationLink {
-                        ArchiveDetailView(entry: entry, theme: theme)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(entry.date.formatted(date: .complete, time: .omitted))
-                                .font(.headline)
-                            Text(summary(for: entry))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
+    private var listContent: some View {
+        List {
+            ForEach(entries) { entry in
+                NavigationLink {
+                    ArchiveDetailView(entry: entry, theme: theme)
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(entry.date.formatted(date: .complete, time: .omitted))
+                            .font(.headline)
+                        Text(summary(for: entry))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                }
-            }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #else
-            .listStyle(.inset)
-            #endif
-            .navigationTitle("Archive")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Archive")
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .padding(.vertical, 4)
                 }
             }
         }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
+    }
+
+    var body: some View {
+        #if os(iOS)
+        NavigationStack {
+            listContent
+                .navigationTitle("Archive")
+                .inlineNavigationBarTitle()
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Archive")
+                            .font(.system(size: 20, weight: .semibold, design: .serif))
+                    }
+                }
+        }
         .tint(theme.accent)
+        #else
+        listContent
+            .tint(theme.accent)
+        #endif
     }
 
     private func summary(for entry: DayEntry) -> String {
@@ -509,83 +599,87 @@ private struct SettingsView: View {
         )
     }
 
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Prompt Times") {
-                    DatePicker("Morning Prompt", selection: $settings.morningTime, displayedComponents: .hourAndMinute)
-                    DatePicker("Midday Prompt", selection: $settings.middayTime, displayedComponents: .hourAndMinute)
-                    DatePicker("Evening Prompt", selection: $settings.eveningTime, displayedComponents: .hourAndMinute)
-                }
-
-                Section("Theme") {
-                    Picker("Theme", selection: $settings.theme) {
-                        ForEach(ThemeOption.allCases, id: \.self) { option in
-                            Label {
-                                Text(option.displayName)
-                            } icon: {
-                                Circle()
-                                    .fill(ThemePalette(option: option).accent)
-                                    .frame(width: 15, height: 15)
-                            }
-                            .tag(option)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                }
-
-                Section("Appearance") {
-                    Picker("App Appearance", selection: $settings.appearanceMode) {
-                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName)
-                                .tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Onboarding") {
-                    Toggle("Reset onboarding", isOn: onboardingResetBinding)
-                }
-
-                Section("Export") {
-                    #if os(iOS)
-                    Button {
-                        startExport()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Label("Export CSV", systemImage: "square.and.arrow.up")
-                            if isExportingCSV {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-                    }
-                    .disabled(isExportingCSV)
-                    #else
-                    ShareLink(item: makeCSVFileURL()) {
-                        Label("Export CSV", systemImage: "square.and.arrow.up")
-                    }
-                    #endif
-                }
-
-                Section("Credits") {
-                    NavigationLink("Credits") {
-                        CreditsView(theme: theme)
-                    }
-                }
+    private var formContent: some View {
+        Form {
+            Section("Prompt Times") {
+                DatePicker("Morning Prompt", selection: $settings.morningTime, displayedComponents: .hourAndMinute)
+                DatePicker("Midday Prompt", selection: $settings.middayTime, displayedComponents: .hourAndMinute)
+                DatePicker("Evening Prompt", selection: $settings.eveningTime, displayedComponents: .hourAndMinute)
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Settings")
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
+
+            Section("Theme") {
+                Picker("Theme", selection: $settings.theme) {
+                    ForEach(ThemeOption.allCases, id: \.self) { option in
+                        Label {
+                            Text(option.displayName)
+                        } icon: {
+                            Circle()
+                                .fill(ThemePalette(option: option).accent)
+                                .frame(width: 15, height: 15)
+                        }
+                        .tag(option)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+
+            Section("Appearance") {
+                Picker("App Appearance", selection: $settings.appearanceMode) {
+                    ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName)
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Onboarding") {
+                Toggle("Reset onboarding", isOn: onboardingResetBinding)
+            }
+
+            Section("Export") {
+                #if os(iOS)
+                Button {
+                    startExport()
+                } label: {
+                    HStack(spacing: 8) {
+                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                        if isExportingCSV {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                }
+                .disabled(isExportingCSV)
+                #else
+                ShareLink(item: makeCSVFileURL()) {
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
+                }
+                #endif
+            }
+
+            Section("Credits") {
+                NavigationLink("Credits") {
+                    CreditsView(theme: theme)
                 }
             }
         }
-        .tint(theme.accent)
+    }
+
+    var body: some View {
         #if os(iOS)
+        NavigationStack {
+            formContent
+                .navigationTitle("Settings")
+                .inlineNavigationBarTitle()
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Settings")
+                            .font(.system(size: 20, weight: .semibold, design: .serif))
+                    }
+                }
+        }
+        .tint(theme.accent)
         .sheet(isPresented: $isPresentingShareSheet, onDismiss: {
             isExportingCSV = false
             exportURL = nil
@@ -599,6 +693,9 @@ private struct SettingsView: View {
                 ProgressView()
             }
         }
+        #else
+        formContent
+            .tint(theme.accent)
         #endif
     }
 
@@ -724,7 +821,7 @@ private struct CreditsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.background)
         .navigationTitle("Credits")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationBarTitle()
     }
 }
 
@@ -780,13 +877,15 @@ private struct OnboardingView: View {
             }
             .background(theme.background)
             .navigationTitle("Daily Three")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+            .inlineNavigationBarTitle()
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Daily Three")
                         .font(.system(size: 20, weight: .semibold, design: .serif))
                 }
             }
+            #endif
         }
         .tint(theme.accent)
         .onChange(of: entry.taskOne) { _, _ in onSnapshotChange() }
@@ -1080,6 +1179,7 @@ private struct NotesCard: View {
                     .frame(minHeight: 90)
                     .padding(8)
                     .font(.system(size: 16, weight: .regular, design: .serif))
+                    .scrollContentBackground(.hidden)
                     .background(theme.field)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
@@ -1104,6 +1204,8 @@ private struct NotesCard: View {
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
+    #else
+    private func dismissKeyboard() { }
     #endif
 }
 
@@ -1233,43 +1335,23 @@ private struct ThemePalette {
     let option: ThemeOption
 
     var accent: Color {
-        #if os(iOS)
-        return dynamicColor(light: palette.accentLight, dark: palette.accentDark)
-        #else
-        return Color(nsColor: palette.accentLight)
-        #endif
+        dynamicColor(light: palette.accentLight, dark: palette.accentDark)
     }
 
     var background: Color {
-        #if os(iOS)
-        return dynamicColor(light: palette.backgroundLight, dark: palette.backgroundDark)
-        #else
-        return Color(nsColor: palette.backgroundLight)
-        #endif
+        dynamicColor(light: palette.backgroundLight, dark: palette.backgroundDark)
     }
 
     var card: Color {
-        #if os(iOS)
-        return dynamicColor(light: palette.cardLight, dark: palette.cardDark)
-        #else
-        return Color(nsColor: palette.cardLight)
-        #endif
+        dynamicColor(light: palette.cardLight, dark: palette.cardDark)
     }
 
     var field: Color {
-        #if os(iOS)
-        return dynamicColor(light: palette.fieldLight, dark: palette.fieldDark)
-        #else
-        return Color(nsColor: palette.fieldLight)
-        #endif
+        dynamicColor(light: palette.fieldLight, dark: palette.fieldDark)
     }
 
     var border: Color {
-        #if os(iOS)
-        return dynamicColor(light: palette.borderLight, dark: palette.borderDark)
-        #else
-        return Color(nsColor: palette.borderLight)
-        #endif
+        dynamicColor(light: palette.borderLight, dark: palette.borderDark)
     }
 
     var muted: Color {
@@ -1280,6 +1362,12 @@ private struct ThemePalette {
     private func dynamicColor(light: UIColor, dark: UIColor) -> Color {
         Color(uiColor: UIColor { trait in
             trait.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+    #else
+    private func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
         })
     }
     #endif
@@ -1324,11 +1412,11 @@ private struct ThemePalette {
         let accentDark: PlatformColor
 
         var cardLight: PlatformColor { backgroundLight.withAlphaComponent(0.8) }
-        var cardDark: PlatformColor { PlatformColor.black.withAlphaComponent(0.4) }
+        var cardDark: PlatformColor { PlatformColor(red: 0.15, green: 0.15, blue: 0.18, alpha: 1) }
         var fieldLight: PlatformColor { PlatformColor.white.withAlphaComponent(0.75) }
-        var fieldDark: PlatformColor { PlatformColor.black.withAlphaComponent(0.5) }
+        var fieldDark: PlatformColor { PlatformColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1) }
         var borderLight: PlatformColor { PlatformColor.black.withAlphaComponent(0.12) }
-        var borderDark: PlatformColor { PlatformColor.white.withAlphaComponent(0.18) }
+        var borderDark: PlatformColor { PlatformColor.white.withAlphaComponent(0.12) }
     }
 }
 
