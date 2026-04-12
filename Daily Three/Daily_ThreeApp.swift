@@ -11,6 +11,8 @@ import Foundation
 
 @main
 struct Daily_ThreeApp: App {
+    @State private var router = DeepLinkRouter()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             DayEntry.self,
@@ -36,6 +38,7 @@ struct Daily_ThreeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(router)
         }
         .modelContainer(sharedModelContainer)
     }

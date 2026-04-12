@@ -20,15 +20,25 @@ private typealias PlatformColor = UIColor
 private typealias PlatformColor = NSColor
 #endif
 
-private enum AppTab: Hashable {
+enum AppTab: Hashable {
     case today
     case archive
     case settings
+
+    init?(urlValue: String) {
+        switch urlValue.lowercased() {
+        case "today": self = .today
+        case "archive": self = .archive
+        case "settings": self = .settings
+        default: return nil
+        }
+    }
 }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(DeepLinkRouter.self) private var router
     @Query(sort: \DayEntry.date, order: .reverse) private var entries: [DayEntry]
     @Query private var settingsList: [AppSettings]
 
@@ -86,11 +96,19 @@ struct ContentView: View {
             ensureSettings()
             requestNotificationsIfNeeded()
             writeSnapshotForToday()
-            selectedTab = .today
+            if !router.hasPendingAction {
+                selectedTab = .today
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
+            if newPhase == .active && !router.recentlyHandled {
                 selectedTab = .today
+            }
+        }
+        .onOpenURL { url in
+            router.handle(url: url)
+            if let action = router.consumeAction() {
+                handleDeepLink(action)
             }
         }
         .onChange(of: settings?.morningTime) { _, _ in
@@ -177,6 +195,85 @@ struct ContentView: View {
             // Save failures shouldn't block snapshot updates.
         }
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func handleDeepLink(_ action: DeepLinkAction) {
+        let entry: DayEntry
+        if let existing = todayEntry {
+            entry = existing
+        } else {
+            let newEntry = DayEntry(date: Date())
+            modelContext.insert(newEntry)
+            entry = newEntry
+        }
+
+        switch action {
+        case .openTab(let tab):
+            selectedTab = tab
+
+        case .setTasks(let t1, let t2, let t3):
+            if let t1 { entry.taskOne = t1 }
+            if let t2 { entry.taskTwo = t2 }
+            if let t3 { entry.taskThree = t3 }
+            selectedTab = .today
+            writeSnapshotForToday()
+
+        case .addProgressNote(let text, let mode):
+            switch mode {
+            case .set:
+                entry.progressNote = text
+            case .append:
+                if entry.progressNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    entry.progressNote = text
+                } else {
+                    entry.progressNote += "\n\n" + text
+                }
+            }
+            selectedTab = .today
+            writeSnapshotForToday()
+
+        case .addCompletionNote(let text, let mode):
+            switch mode {
+            case .set:
+                entry.completionNote = text
+            case .append:
+                if entry.completionNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    entry.completionNote = text
+                } else {
+                    entry.completionNote += "\n\n" + text
+                }
+            }
+            selectedTab = .today
+            writeSnapshotForToday()
+
+        case .completeTask(let slot, let value):
+            applyCompletion(entry: entry, slot: slot, value: value)
+            selectedTab = .today
+            writeSnapshotForToday()
+        }
+    }
+
+    private func applyCompletion(entry: DayEntry, slot: TaskSlot, value: CompletionValue) {
+        func apply(current: Bool) -> Bool {
+            switch value {
+            case .true: return true
+            case .false: return false
+            case .toggle: return !current
+            }
+        }
+
+        switch slot {
+        case .one:
+            entry.taskOneDone = apply(current: entry.taskOneDone)
+        case .two:
+            entry.taskTwoDone = apply(current: entry.taskTwoDone)
+        case .three:
+            entry.taskThreeDone = apply(current: entry.taskThreeDone)
+        case .all:
+            entry.taskOneDone = apply(current: entry.taskOneDone)
+            entry.taskTwoDone = apply(current: entry.taskTwoDone)
+            entry.taskThreeDone = apply(current: entry.taskThreeDone)
+        }
     }
 
 }
@@ -1200,4 +1297,5 @@ private extension AppearanceMode {
 #Preview {
     ContentView()
         .modelContainer(for: [DayEntry.self, AppSettings.self], inMemory: true)
+        .environment(DeepLinkRouter())
 }
