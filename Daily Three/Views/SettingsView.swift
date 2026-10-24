@@ -204,6 +204,7 @@ struct SettingsView: View {
         }
         #else
         formContent
+            .formStyle(.grouped)
             .tint(theme.accent)
         #endif
     }

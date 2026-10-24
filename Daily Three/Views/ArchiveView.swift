@@ -4,26 +4,28 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ArchiveView: View {
     let entries: [DayEntry]
     let theme: ThemePalette
+    @State private var selectedID: DayEntry.ID?
+
+    private var selectedEntry: DayEntry? {
+        entries.first { $0.id == selectedID }
+    }
 
     private var listContent: some View {
-        List {
+        List(selection: $selectedID) {
             ForEach(entries) { entry in
-                NavigationLink {
-                    ArchiveDetailView(entry: entry, theme: theme)
-                } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(entry.date.formatted(date: .complete, time: .omitted))
-                            .font(.headline)
-                        Text(summary(for: entry))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(entry.date.formatted(date: .complete, time: .omitted))
+                        .font(.headline)
+                    Text(summary(for: entry))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+                .padding(.vertical, 4)
             }
         }
         #if os(iOS)
@@ -33,9 +35,21 @@ struct ArchiveView: View {
         #endif
     }
 
+    @ViewBuilder
+    private var detailContent: some View {
+        if let selectedEntry {
+            ArchiveDetailView(entry: selectedEntry, theme: theme)
+        } else {
+            ContentUnavailableView("Select a Day", systemImage: "calendar", description: Text("Pick a day to see its tasks and notes."))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(theme.background)
+        }
+    }
+
     var body: some View {
         #if os(iOS)
-        NavigationStack {
+        // Collapses to list → push on narrow screens and shows both panes when there is room.
+        NavigationSplitView {
             listContent
                 .navigationTitle("Archive")
                 .inlineNavigationBarTitle()
@@ -45,11 +59,18 @@ struct ArchiveView: View {
                             .font(.system(size: 20, weight: .semibold, design: .serif))
                     }
                 }
+        } detail: {
+            detailContent
         }
         .tint(theme.accent)
         #else
-        listContent
-            .tint(theme.accent)
+        HSplitView {
+            listContent
+                .frame(minWidth: 240, idealWidth: 300, maxWidth: 420)
+            detailContent
+                .frame(minWidth: 320, maxWidth: .infinity)
+        }
+        .tint(theme.accent)
         #endif
     }
 
@@ -82,6 +103,8 @@ private struct ArchiveDetailView: View {
                 }
             }
             .padding(16)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
         }
         .background(theme.background)
         .navigationTitle("Details")

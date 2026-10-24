@@ -12,8 +12,43 @@ struct NotesCard: View {
     let theme: ThemePalette
     var isEditable: Bool = true
     @FocusState private var isFocused: Bool
+    @Environment(\.surfaceStyle) private var style
 
     var body: some View {
+        if style == .flat {
+            flatBody
+        } else {
+            cardBody
+        }
+    }
+
+    /// Section title with a rule, then plain text. No boxes.
+    private var flatBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FlatSectionHeader(title: title, theme: theme)
+
+            if !prompt.isEmpty {
+                Text(prompt)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+
+            if isEditable {
+                TextEditor(text: $text)
+                    .focused($isFocused)
+                    .frame(minHeight: 110)
+                    .font(.system(size: 15))
+                    .scrollContentBackground(.hidden)
+            } else {
+                Text(text)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title)
@@ -54,6 +89,7 @@ struct NotesCard: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))

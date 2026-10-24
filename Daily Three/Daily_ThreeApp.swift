@@ -48,12 +48,12 @@ struct Daily_ThreeApp: App {
             ContentView()
                 .environment(router)
                 #if os(macOS)
-                .frame(minWidth: 500, minHeight: 600)
+                .frame(minWidth: 760, minHeight: 540)
                 #endif
         }
         .modelContainer(sharedModelContainer)
         #if os(macOS)
-        .defaultSize(width: 700, height: 800)
+        .defaultSize(width: 1040, height: 780)
         #endif
     }
 }
