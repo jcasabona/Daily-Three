@@ -13,27 +13,41 @@ struct TaskListCard: View {
     var showCheckboxes: Bool = true
     var showDragHandles: Bool = true
     @State private var draggedIndex: Int?
+    @Environment(\.surfaceStyle) private var style
 
     private var cardTitle: String {
         showCheckboxes ? "Today's Tasks" : "Tasks"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(cardTitle)
-                .font(.system(.headline, design: .serif))
+        if style == .flat {
+            VStack(alignment: .leading, spacing: 4) {
+                FlatSectionHeader(title: cardTitle, theme: theme)
+                    .padding(.bottom, 4)
 
-            ForEach(0..<3, id: \.self) { index in
-                taskRowView(index: index)
+                ForEach(0..<3, id: \.self) { index in
+                    taskRowView(index: index)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(cardTitle)
+                    .font(.system(.headline, design: .serif))
+
+                ForEach(0..<3, id: \.self) { index in
+                    taskRowView(index: index)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(theme.border, lineWidth: 1)
+            )
         }
-        .padding(16)
-        .background(theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(theme.border, lineWidth: 1)
-        )
     }
 
     @ViewBuilder
@@ -118,8 +132,52 @@ private struct TaskRow: View {
     let theme: ThemePalette
     var showsDragHandle: Bool = false
     var showCheckbox: Bool = true
+    @Environment(\.surfaceStyle) private var style
 
     var body: some View {
+        if style == .flat {
+            flatBody
+        } else {
+            cardBody
+        }
+    }
+
+    /// Plain list row: small square checkbox and text, no box around it.
+    private var flatBody: some View {
+        HStack(spacing: 10) {
+            if showCheckbox {
+                Button(action: { isDone.toggle() }) {
+                    Image(systemName: isDone ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 17))
+                        .foregroundStyle(isDone ? theme.accent : theme.muted)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEditable)
+            }
+
+            if isEditable {
+                TextField(title, text: $text)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16))
+                    .foregroundStyle(isDone ? .secondary : .primary)
+            } else {
+                Text(text.isEmpty ? title : text)
+                    .font(.system(size: 16))
+                    .foregroundStyle(text.isEmpty || isDone ? .secondary : .primary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 7)
+        .overlay(alignment: .trailing) {
+            if showsDragHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.muted.opacity(0.6))
+            }
+        }
+    }
+
+    private var cardBody: some View {
         HStack(spacing: 12) {
             if showCheckbox {
                 Button(action: { isDone.toggle() }) {
@@ -141,6 +199,8 @@ private struct TaskRow: View {
                     .font(.system(size: 17, weight: .regular, design: .serif))
             }
         }
+        // Read-only rows are plain Text and would otherwise hug their content.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(theme.field)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

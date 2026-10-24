@@ -49,7 +49,7 @@ final class AppSettings {
     var morningTime: Date = Date()
     var middayTime: Date = Date()
     var eveningTime: Date = Date()
-    var themeRaw: String = ThemeOption.sunrise.rawValue
+    var themeRaw: String = ThemeOption.graphite.rawValue
     var appearanceModeRaw: String = AppearanceMode.system.rawValue
     var hasCompletedOnboarding: Bool?
     /// Comma-separated `Calendar` weekday numbers (1 = Sunday ... 7 = Saturday) the user has turned off.
@@ -61,7 +61,7 @@ final class AppSettings {
     }
 
     @Transient var theme: ThemeOption {
-        get { ThemeOption(rawValue: themeRaw) ?? .sunrise }
+        get { ThemeOption(rawValue: themeRaw) ?? .graphite }
         set { themeRaw = newValue.rawValue }
     }
 
@@ -76,7 +76,7 @@ final class AppSettings {
         self.morningTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         self.middayTime = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: today) ?? today
         self.eveningTime = calendar.date(bySettingHour: 17, minute: 0, second: 0, of: today) ?? today
-        self.themeRaw = ThemeOption.sunrise.rawValue
+        self.themeRaw = ThemeOption.graphite.rawValue
         self.appearanceModeRaw = AppearanceMode.system.rawValue
     }
 }

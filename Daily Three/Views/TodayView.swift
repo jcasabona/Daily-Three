@@ -14,6 +14,20 @@ struct TodayView: View {
     let onSnapshotChange: () -> Void
     let onTasksSetChange: () -> Void
     @State private var lastHasAllTasksSet: Bool?
+    @State private var availableWidth: CGFloat = 0
+    @Environment(\.surfaceStyle) private var style
+
+    private var sectionSpacing: CGFloat { style == .flat ? 28 : 16 }
+    private var horizontalPadding: CGFloat { style == .flat ? 36 : 16 }
+
+    /// Width at which Today puts tasks and notes side by side instead of stacking them.
+    private static let twoColumnMinWidth: CGFloat = 640
+    /// Keeps a single column readable when the window is wide but there is no second column.
+    private static let singleColumnMaxWidth: CGFloat = 640
+
+    private var usesTwoColumns: Bool {
+        editingMode == .today && availableWidth >= Self.twoColumnMinWidth
+    }
 
     private var subtitle: String {
         editingMode == .today ? "Your three tasks" : "Plan ahead"
@@ -27,24 +41,50 @@ struct TodayView: View {
         editingMode == .today
     }
 
+    private var planningSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            DateSelectorBar(dates: selectableDates, selectedDate: $selectedDate, theme: theme)
+
+            HeaderCard(title: formattedDate(entry.date), subtitle: subtitle, theme: theme)
+
+            TaskListCard(entry: $entry, theme: theme, isEditable: editingMode != .readOnly, showCheckboxes: showCheckboxes, showDragHandles: showDragHandles)
+        }
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
+
+            NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+        }
+    }
+
     private var scrollContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                DateSelectorBar(dates: selectableDates, selectedDate: $selectedDate, theme: theme)
+            Group {
+                if usesTwoColumns {
+                    HStack(alignment: .top, spacing: sectionSpacing + 8) {
+                        planningSection
+                            .frame(maxWidth: .infinity)
+                        notesSection
+                            .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: sectionSpacing) {
+                        planningSection
 
-                HeaderCard(title: formattedDate(entry.date), subtitle: subtitle, theme: theme)
-
-                TaskListCard(entry: $entry, theme: theme, isEditable: editingMode != .readOnly, showCheckboxes: showCheckboxes, showDragHandles: showDragHandles)
-
-                if editingMode == .today {
-                    NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
-
-                    NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+                        if editingMode == .today {
+                            notesSection
+                        }
+                    }
+                    .frame(maxWidth: Self.singleColumnMaxWidth)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, horizontalPadding)
             .padding(.bottom, 32)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
     }
 
     #if os(iOS)
@@ -65,9 +105,7 @@ struct TodayView: View {
     #else
     private var viewContainer: some View {
         scrollContent
-            .padding(.top, 12)
-            .frame(maxWidth: 600)
-            .frame(maxWidth: .infinity)
+            .padding(.top, 24)
             .background(theme.background)
     }
     #endif

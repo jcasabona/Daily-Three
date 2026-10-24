@@ -80,8 +80,45 @@ struct ContentView: View {
     }
 
     #if os(macOS)
+    private var sidebarSelection: Binding<AppTab?> {
+        Binding(get: { selectedTab }, set: { if let tab = $0 { selectedTab = tab } })
+    }
+
+    private var sidebar: some View {
+        List(selection: sidebarSelection) {
+            Section {
+                Label {
+                    Text("Today")
+                } icon: {
+                    Image(systemName: "star.fill").foregroundStyle(.yellow)
+                }
+                .tag(AppTab.today)
+
+                Label {
+                    Text("Archive")
+                } icon: {
+                    Image(systemName: "books.vertical.fill").foregroundStyle(.green)
+                }
+                .tag(AppTab.archive)
+            }
+
+            Section {
+                Label {
+                    Text("Settings")
+                } icon: {
+                    Image(systemName: "gearshape.fill").foregroundStyle(.gray)
+                }
+                .tag(AppTab.settings)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+    }
+
     private var mainContainer: some View {
-        NavigationStack {
+        NavigationSplitView {
+            sidebar
+        } detail: {
             Group {
                 switch selectedTab {
                 case .today:
@@ -105,22 +142,8 @@ struct ContentView: View {
                 }
             }
             .toolbar(removing: .title)
-            .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    Text("Daily Three")
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                }
-                ToolbarItem(placement: .principal) {
-                    Picker("", selection: $selectedTab) {
-                        Text("Today").tag(AppTab.today)
-                        Text("Archive").tag(AppTab.archive)
-                        Text("Settings").tag(AppTab.settings)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 250)
-                }
-            }
         }
+        .environment(\.surfaceStyle, .flat)
         .tint(currentTheme().accent)
     }
     #else
@@ -275,7 +298,7 @@ struct ContentView: View {
     }
 
     private func currentTheme() -> ThemePalette {
-        let option = settings?.theme ?? .sunrise
+        let option = settings?.theme ?? .graphite
         return ThemePalette(option: option)
     }
 
@@ -378,3 +401,4 @@ struct ContentView: View {
         .modelContainer(for: [DayEntry.self, AppSettings.self], inMemory: true)
         .environment(DeepLinkRouter())
 }
+
