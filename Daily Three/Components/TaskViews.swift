@@ -13,13 +13,38 @@ struct TaskListCard: View {
     var showCheckboxes: Bool = true
     var showDragHandles: Bool = true
     @State private var draggedIndex: Int?
+    @State private var pickerTarget: TodoistPickerTarget?
     @Environment(\.surfaceStyle) private var style
+    @Environment(TodoistSyncService.self) private var todoist: TodoistSyncService?
 
     private var cardTitle: String {
         showCheckboxes ? "Today's Tasks" : "Tasks"
     }
 
     var body: some View {
+        content
+            .sheet(item: $pickerTarget) { target in
+                TodoistTaskPicker(theme: theme, excludedIDs: linkedTaskIDs) { task in
+                    todoist?.link(task, toSlot: target.slot, in: entry)
+                }
+            }
+    }
+
+    /// Todoist tasks already linked on this day.
+    private var linkedTaskIDs: Set<String> {
+        Set((0..<DayEntry.slotCount).map { entry.todoistLink(in: $0).taskID }.filter { !$0.isEmpty })
+    }
+
+    /// The Todoist menu for a row, or `nil` when Todoist isn't connected or the day isn't editable.
+    private func todoistControls(for index: Int) -> TodoistRowControls? {
+        guard isEditable, let todoist, todoist.isConnected else { return nil }
+        return TodoistRowControls(isLinked: entry.todoistLink(in: index).isLinked,
+                                  pick: { pickerTarget = TodoistPickerTarget(slot: index) },
+                                  unlink: { todoist.unlink(slot: index, in: entry) })
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if style == .flat {
             VStack(alignment: .leading, spacing: 4) {
                 FlatSectionHeader(title: cardTitle, theme: theme)
@@ -58,7 +83,8 @@ struct TaskListCard: View {
                           isEditable: isEditable,
                           theme: theme,
                           showsDragHandle: showDragHandles,
-                          showCheckbox: showCheckboxes)
+                          showCheckbox: showCheckboxes,
+                          todoist: todoistControls(for: index))
             .contentShape(Rectangle())
 
         if showDragHandles {
@@ -132,7 +158,13 @@ private struct TaskRow: View {
     let theme: ThemePalette
     var showsDragHandle: Bool = false
     var showCheckbox: Bool = true
+    var todoist: TodoistRowControls?
     @Environment(\.surfaceStyle) private var style
+
+    /// Leaves room for the drag handle so the Todoist menu doesn't sit underneath it.
+    private var handleClearance: CGFloat {
+        showsDragHandle && todoist != nil ? 26 : 0
+    }
 
     var body: some View {
         if style == .flat {
@@ -165,8 +197,13 @@ private struct TaskRow: View {
                     .font(.system(size: 16))
                     .foregroundStyle(text.isEmpty || isDone ? .secondary : .primary)
             }
+
+            if let todoist {
+                TodoistRowMenu(controls: todoist, theme: theme)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, handleClearance)
         .padding(.vertical, 7)
         .overlay(alignment: .trailing) {
             if showsDragHandle {
@@ -198,9 +235,14 @@ private struct TaskRow: View {
                     .foregroundStyle(text.isEmpty ? .secondary : .primary)
                     .font(.system(size: 17, weight: .regular, design: .serif))
             }
+
+            if let todoist {
+                TodoistRowMenu(controls: todoist, theme: theme)
+            }
         }
         // Read-only rows are plain Text and would otherwise hug their content.
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, handleClearance)
         .padding(12)
         .background(theme.field)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -239,36 +281,9 @@ private struct TaskDropDelegate: DropDelegate {
         DropProposal(operation: .move)
     }
 
+    /// Swaps whole slots, so a task keeps its completion and Todoist link when it moves.
     private func swapTasks(from: Int, to: Int) {
-        let source = taskPair(for: from)
-        let destination = taskPair(for: to)
-        setTask(for: from, text: destination.text, done: destination.done)
-        setTask(for: to, text: source.text, done: source.done)
-    }
-
-    private func taskPair(for index: Int) -> (text: String, done: Bool) {
-        switch index {
-        case 0:
-            return (entry.taskOne, entry.taskOneDone)
-        case 1:
-            return (entry.taskTwo, entry.taskTwoDone)
-        default:
-            return (entry.taskThree, entry.taskThreeDone)
-        }
-    }
-
-    private func setTask(for index: Int, text: String, done: Bool) {
-        switch index {
-        case 0:
-            entry.taskOne = text
-            entry.taskOneDone = done
-        case 1:
-            entry.taskTwo = text
-            entry.taskTwoDone = done
-        default:
-            entry.taskThree = text
-            entry.taskThreeDone = done
-        }
+        entry.swapSlots(from, to)
     }
 }
 
