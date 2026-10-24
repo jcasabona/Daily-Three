@@ -41,6 +41,20 @@ struct ThemePalette {
         Color.secondary
     }
 
+    /// Text or icon color for content drawn on top of `accent`. White, unless the accent is so light
+    /// (like the Sunrise yellow) that white would be unreadable.
+    var onAccent: Color {
+        dynamicColor(light: Self.contrastColor(for: palette.accentLight),
+                     dark: Self.contrastColor(for: palette.accentDark))
+    }
+
+    private static func contrastColor(for color: PlatformColor) -> PlatformColor {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let brightness = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        return brightness > 0.78 ? PlatformColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 1) : PlatformColor.white
+    }
+
     #if os(iOS)
     private func dynamicColor(light: UIColor, dark: UIColor) -> Color {
         Color(uiColor: UIColor { trait in
@@ -59,30 +73,30 @@ struct ThemePalette {
         switch option {
         case .sunrise:
             return ThemePaletteValues(
-                backgroundLight: PlatformColor(red: 0.99, green: 0.95, blue: 0.90, alpha: 1),
+                backgroundLight: PlatformColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1),
                 backgroundDark: PlatformColor(red: 0.16, green: 0.12, blue: 0.11, alpha: 1),
-                accentLight: PlatformColor(red: 0.95, green: 0.48, blue: 0.30, alpha: 1),
-                accentDark: PlatformColor(red: 0.99, green: 0.67, blue: 0.44, alpha: 1)
+                accentLight: PlatformColor(red: 0.580, green: 0.502, blue: 0.278, alpha: 1),   // #948047: brand yellow #F7D677 darkened two 20% steps for contrast on white
+                accentDark: PlatformColor(red: 0.969, green: 0.839, blue: 0.467, alpha: 1)
             )
         case .ocean:
             return ThemePaletteValues(
-                backgroundLight: PlatformColor(red: 0.91, green: 0.96, blue: 0.99, alpha: 1),
+                backgroundLight: PlatformColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1),
                 backgroundDark: PlatformColor(red: 0.09, green: 0.12, blue: 0.18, alpha: 1),
-                accentLight: PlatformColor(red: 0.16, green: 0.47, blue: 0.78, alpha: 1),
+                accentLight: PlatformColor(red: 0.031, green: 0.173, blue: 0.271, alpha: 1),   // #082C45
                 accentDark: PlatformColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
             )
         case .forest:
             return ThemePaletteValues(
-                backgroundLight: PlatformColor(red: 0.92, green: 0.97, blue: 0.93, alpha: 1),
+                backgroundLight: PlatformColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1),
                 backgroundDark: PlatformColor(red: 0.10, green: 0.14, blue: 0.11, alpha: 1),
                 accentLight: PlatformColor(red: 0.18, green: 0.54, blue: 0.34, alpha: 1),
                 accentDark: PlatformColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
             )
         case .graphite:
             return ThemePaletteValues(
-                backgroundLight: PlatformColor(red: 0.93, green: 0.94, blue: 0.96, alpha: 1),
+                backgroundLight: PlatformColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1),
                 backgroundDark: PlatformColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 1),
-                accentLight: PlatformColor(red: 0.32, green: 0.33, blue: 0.36, alpha: 1),
+                accentLight: PlatformColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1),   // #333333
                 accentDark: PlatformColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
             )
         }

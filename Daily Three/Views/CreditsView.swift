@@ -26,6 +26,7 @@ struct CreditsView: View {
             VStack(spacing: 12) {
                 Link(destination: URL(string: "https://streamlined.fm/#work")!) {
                     Text("Hire Me")
+                        .foregroundStyle(theme.onAccent)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)

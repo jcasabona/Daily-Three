@@ -51,7 +51,7 @@ private struct DateChip: View {
         }
         .frame(width: 44, height: 52)
         .background(isSelected ? theme.accent : theme.card)
-        .foregroundStyle(isSelected ? .white : .primary)
+        .foregroundStyle(isSelected ? theme.onAccent : .primary)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)

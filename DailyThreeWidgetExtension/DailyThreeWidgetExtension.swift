@@ -52,7 +52,7 @@ struct DailySnapshotProvider: TimelineProvider {
             let descriptor = FetchDescriptor<DayEntry>(predicate: #Predicate { $0.dateKey == todayKey })
             if let entry = try context.fetch(descriptor).first {
                 let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-                let theme = settings?.theme ?? .sunrise
+                let theme = settings?.theme ?? .graphite
                 return DailySnapshot(date: entry.date,
                                      tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
                                      completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],
@@ -505,12 +505,12 @@ private func themeAccentColor(_ option: ThemeOption) -> Color {
         switch option {
         case .sunrise:
             return isDark
-            ? UIColor(red: 0.99, green: 0.67, blue: 0.44, alpha: 1)
-            : UIColor(red: 0.95, green: 0.48, blue: 0.30, alpha: 1)
+            ? UIColor(red: 0.969, green: 0.839, blue: 0.467, alpha: 1)
+            : UIColor(red: 0.580, green: 0.502, blue: 0.278, alpha: 1)
         case .ocean:
             return isDark
             ? UIColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
-            : UIColor(red: 0.16, green: 0.47, blue: 0.78, alpha: 1)
+            : UIColor(red: 0.031, green: 0.173, blue: 0.271, alpha: 1)
         case .forest:
             return isDark
             ? UIColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
@@ -518,7 +518,7 @@ private func themeAccentColor(_ option: ThemeOption) -> Color {
         case .graphite:
             return isDark
             ? UIColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
-            : UIColor(red: 0.32, green: 0.33, blue: 0.36, alpha: 1)
+            : UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)
         }
     })
     #else
@@ -527,12 +527,12 @@ private func themeAccentColor(_ option: ThemeOption) -> Color {
         switch option {
         case .sunrise:
             return isDark
-            ? NSColor(red: 0.99, green: 0.67, blue: 0.44, alpha: 1)
-            : NSColor(red: 0.95, green: 0.48, blue: 0.30, alpha: 1)
+            ? NSColor(red: 0.969, green: 0.839, blue: 0.467, alpha: 1)
+            : NSColor(red: 0.580, green: 0.502, blue: 0.278, alpha: 1)
         case .ocean:
             return isDark
             ? NSColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
-            : NSColor(red: 0.16, green: 0.47, blue: 0.78, alpha: 1)
+            : NSColor(red: 0.031, green: 0.173, blue: 0.271, alpha: 1)
         case .forest:
             return isDark
             ? NSColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
@@ -540,7 +540,7 @@ private func themeAccentColor(_ option: ThemeOption) -> Color {
         case .graphite:
             return isDark
             ? NSColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
-            : NSColor(red: 0.32, green: 0.33, blue: 0.36, alpha: 1)
+            : NSColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)
         }
     })
     #endif
@@ -551,7 +551,7 @@ private extension DailySnapshot {
         DailySnapshot(date: .now,
                       tasks: ["Task 1", "Task 2", "Task 3"],
                       completed: [false, true, false],
-                      theme: .sunrise)
+                      theme: .graphite)
     }
 }
 
@@ -598,7 +598,7 @@ struct ToggleTaskIntent: AppIntent {
             try context.save()
 
             let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-            let theme = settings?.theme ?? .sunrise
+            let theme = settings?.theme ?? .graphite
             return DailySnapshot(date: entry.date,
                                  tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
                                  completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],

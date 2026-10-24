@@ -48,6 +48,7 @@ struct OnboardingView: View {
                         dismiss()
                     }) {
                         Text("Start Today")
+                            .foregroundStyle(theme.onAccent)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
