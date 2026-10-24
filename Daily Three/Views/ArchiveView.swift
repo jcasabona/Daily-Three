@@ -92,7 +92,7 @@ private struct ArchiveDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HeaderCard(title: entry.date.formatted(date: .complete, time: .omitted), subtitle: "Snapshot", theme: theme)
 
-                TaskListCard(entry: entryBinding, theme: theme, isEditable: false)
+                TaskListCard(entry: entryBinding, theme: theme, isEditable: false, showDragHandles: false)
 
                 if !entry.progressNote.isEmpty {
                     NotesCard(title: "Progress", prompt: "", text: progressBinding, theme: theme, isEditable: false)
