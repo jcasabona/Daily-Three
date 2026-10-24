@@ -52,6 +52,13 @@ final class AppSettings {
     var themeRaw: String = ThemeOption.sunrise.rawValue
     var appearanceModeRaw: String = AppearanceMode.system.rawValue
     var hasCompletedOnboarding: Bool?
+    /// Comma-separated `Calendar` weekday numbers (1 = Sunday ... 7 = Saturday) the user has turned off.
+    var excludedWeekdaysRaw: String = ""
+
+    @Transient var excludedWeekdays: Set<Int> {
+        get { Set(excludedWeekdaysRaw.split(separator: ",").compactMap { Int($0) }) }
+        set { excludedWeekdaysRaw = newValue.sorted().map(String.init).joined(separator: ",") }
+    }
 
     @Transient var theme: ThemeOption {
         get { ThemeOption(rawValue: themeRaw) ?? .sunrise }
@@ -150,7 +157,7 @@ enum DayEntryDeduplicator {
         return s
     }
 
-    private static func merge(from source: DayEntry, into target: DayEntry) {
+    static func merge(from source: DayEntry, into target: DayEntry) {
         if target.taskOne.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             target.taskOne = source.taskOne
         }
