@@ -47,9 +47,10 @@ enum TodoistReconciler {
         var plan = TodoistSlotPlan(state: local)
         guard local.link.isLinked else { return plan }
 
-        // The Todoist task is gone: keep the text, drop the link.
+        // The Todoist task is gone: keep the text and drop the link. The text stays recorded as "synced", so the
+        // sync doesn't see an unlinked task and create it all over again.
         guard let remote, !remote.isDeleted else {
-            plan.state.link = TodoistLink()
+            plan.state.link = TodoistLink(taskID: "", syncedContent: local.text, syncedDone: local.done)
             return plan
         }
 

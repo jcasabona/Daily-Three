@@ -104,6 +104,8 @@ struct SettingsView: View {
             AppIconSection()
             #endif
 
+            TodoistSettingsSection(settings: settings)
+
             Section("Onboarding") {
                 Toggle("Reset onboarding", isOn: onboardingResetBinding)
             }

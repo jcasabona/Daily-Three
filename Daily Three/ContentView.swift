@@ -36,6 +36,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(DeepLinkRouter.self) private var router
+    @Environment(TodoistSyncService.self) private var todoist
     @Query(sort: \DayEntry.date, order: .reverse) private var entries: [DayEntry]
     @Query private var settingsList: [AppSettings]
 
@@ -235,6 +236,21 @@ struct ContentView: View {
         .onChange(of: settings?.excludedWeekdaysRaw) { _, _ in
             scheduleNotificationsIfPossible()
         }
+        // Sync shortly after an edit (the pause means typing doesn't send a request per keystroke),
+        // and again whenever the app comes to the foreground or Todoist gets connected.
+        .task(id: todoistSyncSignature) {
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard !Task.isCancelled else { return }
+            await syncTodoist()
+        }
+        // While the app stays open, pick up changes made in Todoist.
+        .task(id: scenePhase) {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(120))
+                guard !Task.isCancelled else { return }
+                await syncTodoist()
+            }
+        }
         .onChange(of: settings?.themeRaw) { _, _ in
             showingOnboarding = false
         }
@@ -290,6 +306,24 @@ struct ContentView: View {
 
     private func requestNotificationsIfNeeded() {
         NotificationScheduler.shared.requestAuthorizationIfNeeded()
+    }
+
+    /// Changes whenever something Todoist cares about changes, so a sync can follow an edit.
+    private var todoistSyncSignature: String {
+        let slots = entries
+            .filter { $0.dateKey >= todayKey }
+            .map { entry in
+                (0..<DayEntry.slotCount).map { slot in
+                    "\(entry.text(in: slot))|\(entry.isDone(in: slot))|\(entry.todoistLink(in: slot).taskID)"
+                }.joined(separator: ";")
+            }
+            .joined(separator: "#")
+        return "\(todoist.isConnected)|\(scenePhase == .active)|\(settings?.todoistCreatesTasks ?? true)|\(settings?.todoistProjectID ?? "")|\(slots)"
+    }
+
+    private func syncTodoist() async {
+        guard todoist.isConnected, scenePhase == .active else { return }
+        await todoist.sync(context: modelContext, settings: settings)
     }
 
     private func scheduleNotificationsIfPossible() {
@@ -400,5 +434,6 @@ struct ContentView: View {
     ContentView()
         .modelContainer(for: [DayEntry.self, AppSettings.self], inMemory: true)
         .environment(DeepLinkRouter())
+        .environment(TodoistSyncService())
 }
 

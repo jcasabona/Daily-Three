@@ -12,6 +12,7 @@ import Foundation
 @main
 struct Daily_ThreeApp: App {
     @State private var router = DeepLinkRouter()
+    @State private var todoist = TodoistSyncService()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -47,6 +48,7 @@ struct Daily_ThreeApp: App {
         WindowGroup {
             ContentView()
                 .environment(router)
+                .environment(todoist)
                 #if os(macOS)
                 .frame(minWidth: 760, minHeight: 540)
                 #endif
