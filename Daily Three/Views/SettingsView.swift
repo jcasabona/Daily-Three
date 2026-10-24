@@ -100,6 +100,10 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
+            #if os(iOS)
+            AppIconSection()
+            #endif
+
             Section("Onboarding") {
                 Toggle("Reset onboarding", isOn: onboardingResetBinding)
             }
