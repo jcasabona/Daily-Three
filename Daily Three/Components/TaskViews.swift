@@ -239,36 +239,9 @@ private struct TaskDropDelegate: DropDelegate {
         DropProposal(operation: .move)
     }
 
+    /// Swaps whole slots, so a task keeps its completion and Todoist link when it moves.
     private func swapTasks(from: Int, to: Int) {
-        let source = taskPair(for: from)
-        let destination = taskPair(for: to)
-        setTask(for: from, text: destination.text, done: destination.done)
-        setTask(for: to, text: source.text, done: source.done)
-    }
-
-    private func taskPair(for index: Int) -> (text: String, done: Bool) {
-        switch index {
-        case 0:
-            return (entry.taskOne, entry.taskOneDone)
-        case 1:
-            return (entry.taskTwo, entry.taskTwoDone)
-        default:
-            return (entry.taskThree, entry.taskThreeDone)
-        }
-    }
-
-    private func setTask(for index: Int, text: String, done: Bool) {
-        switch index {
-        case 0:
-            entry.taskOne = text
-            entry.taskOneDone = done
-        case 1:
-            entry.taskTwo = text
-            entry.taskTwoDone = done
-        default:
-            entry.taskThree = text
-            entry.taskThreeDone = done
-        }
+        entry.swapSlots(from, to)
     }
 }
 

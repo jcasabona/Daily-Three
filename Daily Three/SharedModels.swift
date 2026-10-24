@@ -21,6 +21,18 @@ final class DayEntry {
     var progressNote: String = ""
     var completionNote: String = ""
 
+    // Todoist links, one per task slot. An empty ID means the slot isn't linked. The "synced" values record
+    // what Todoist and the app last agreed on, so a later sync can tell which side changed.
+    var todoistIDOne: String = ""
+    var todoistIDTwo: String = ""
+    var todoistIDThree: String = ""
+    var todoistSyncedContentOne: String = ""
+    var todoistSyncedContentTwo: String = ""
+    var todoistSyncedContentThree: String = ""
+    var todoistSyncedDoneOne: Bool = false
+    var todoistSyncedDoneTwo: Bool = false
+    var todoistSyncedDoneThree: Bool = false
+
     init(date: Date) {
         let normalized = Calendar.current.startOfDay(for: date)
         self.date = normalized
@@ -54,6 +66,11 @@ final class AppSettings {
     var hasCompletedOnboarding: Bool?
     /// Comma-separated `Calendar` weekday numbers (1 = Sunday ... 7 = Saturday) the user has turned off.
     var excludedWeekdaysRaw: String = ""
+    /// Create new Todoist tasks for unlinked tasks typed in the app.
+    var todoistCreatesTasks: Bool = true
+    /// Project new tasks are created in. Empty means the Todoist Inbox.
+    var todoistProjectID: String = ""
+    var todoistProjectName: String = ""
 
     @Transient var excludedWeekdays: Set<Int> {
         get { Set(excludedWeekdaysRaw.split(separator: ",").compactMap { Int($0) }) }
