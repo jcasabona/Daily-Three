@@ -309,6 +309,10 @@ struct ContentView: View {
     }
 
     private func requestNotificationsIfNeeded() {
+        #if DEBUG
+        // The permission prompt would cover App Store screenshots.
+        if DemoMode.isEnabled { return }
+        #endif
         NotificationScheduler.shared.requestAuthorizationIfNeeded()
     }
 
