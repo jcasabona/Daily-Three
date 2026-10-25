@@ -12,6 +12,13 @@ enum DeepLinkAction: Equatable {
     case addProgressNote(text: String, mode: NoteMode)
     case addCompletionNote(text: String, mode: NoteMode)
     case completeTask(slot: TaskSlot, value: CompletionValue)
+    /// Opens Today and puts the cursor in one of the journal notes (used by the widgets' Journal buttons).
+    case openJournal(JournalSection)
+}
+
+enum JournalSection: String, Equatable {
+    case progress
+    case completion
 }
 
 enum NoteMode: String, Equatable {
@@ -58,6 +65,9 @@ final class DeepLinkRouter {
             if let tabName = params["tab"], let tab = AppTab(urlValue: tabName) {
                 pendingAction = .openTab(tab)
             }
+
+        case "journal":
+            pendingAction = .openJournal(JournalSection(rawValue: params["section"] ?? "") ?? .progress)
 
         case "tasks":
             pendingAction = .setTasks(

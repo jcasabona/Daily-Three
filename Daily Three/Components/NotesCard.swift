@@ -11,14 +11,27 @@ struct NotesCard: View {
     @Binding var text: String
     let theme: ThemePalette
     var isEditable: Bool = true
+    /// Asks the card to put the cursor in its text area (used when a widget's Journal button opens the app).
+    var focusRequested: Bool = false
+    var onFocusHandled: () -> Void = {}
     @FocusState private var isFocused: Bool
     @Environment(\.surfaceStyle) private var style
 
     var body: some View {
-        if style == .flat {
-            flatBody
-        } else {
-            cardBody
+        Group {
+            if style == .flat {
+                flatBody
+            } else {
+                cardBody
+            }
+        }
+        .task(id: focusRequested) {
+            guard focusRequested, isEditable else { return }
+            // Give the screen a moment to appear and scroll before taking focus.
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            isFocused = true
+            onFocusHandled()
         }
     }
 
