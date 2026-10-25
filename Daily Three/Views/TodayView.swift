@@ -11,6 +11,8 @@ struct TodayView: View {
     let editingMode: DayEditingMode
     let selectableDates: [Date]
     @Binding var selectedDate: Date
+    /// A note the app should scroll to and focus, requested by a widget's Journal button.
+    @Binding var focusedJournal: JournalSection?
     let onSnapshotChange: () -> Void
     let onTasksSetChange: () -> Void
     @State private var lastHasAllTasksSet: Bool?
@@ -53,38 +55,48 @@ struct TodayView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme)
+            NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme,
+                      focusRequested: focusedJournal == .progress, onFocusHandled: { focusedJournal = nil })
+                .id(JournalSection.progress)
 
-            NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme)
+            NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme,
+                      focusRequested: focusedJournal == .completion, onFocusHandled: { focusedJournal = nil })
+                .id(JournalSection.completion)
         }
     }
 
     private var scrollContent: some View {
-        ScrollView {
-            Group {
-                if usesTwoColumns {
-                    HStack(alignment: .top, spacing: sectionSpacing + 8) {
-                        planningSection
-                            .frame(maxWidth: .infinity)
-                        notesSection
-                            .frame(maxWidth: .infinity)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: sectionSpacing) {
-                        planningSection
-
-                        if editingMode == .today {
+        ScrollViewReader { proxy in
+            ScrollView {
+                Group {
+                    if usesTwoColumns {
+                        HStack(alignment: .top, spacing: sectionSpacing + 8) {
+                            planningSection
+                                .frame(maxWidth: .infinity)
                             notesSection
+                                .frame(maxWidth: .infinity)
                         }
+                    } else {
+                        VStack(alignment: .leading, spacing: sectionSpacing) {
+                            planningSection
+
+                            if editingMode == .today {
+                                notesSection
+                            }
+                        }
+                        .frame(maxWidth: Self.singleColumnMaxWidth)
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: Self.singleColumnMaxWidth)
-                    .frame(maxWidth: .infinity)
                 }
+                .padding(.horizontal, horizontalPadding)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, 32)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+            .onChange(of: focusedJournal) { _, section in
+                guard let section else { return }
+                withAnimation { proxy.scrollTo(section, anchor: .center) }
+            }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
     }
 
     #if os(iOS)

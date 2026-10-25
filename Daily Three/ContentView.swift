@@ -43,6 +43,8 @@ struct ContentView: View {
     @State private var showingOnboarding = false
     @State private var selectedTab: AppTab = .today
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+    /// Set by the widgets' Journal buttons; Today moves to and focuses that note, then clears it.
+    @State private var focusedJournal: JournalSection?
 
     private var todayKey: String {
         DayEntry.makeDateKey(for: Date())
@@ -129,6 +131,7 @@ struct ContentView: View {
                         editingMode: editingMode,
                         selectableDates: selectableDates,
                         selectedDate: $selectedDate,
+                        focusedJournal: $focusedJournal,
                         onSnapshotChange: writeSnapshotForToday,
                         onTasksSetChange: scheduleNotificationsIfPossible
                     )
@@ -156,6 +159,7 @@ struct ContentView: View {
                 editingMode: editingMode,
                 selectableDates: selectableDates,
                 selectedDate: $selectedDate,
+                focusedJournal: $focusedJournal,
                 onSnapshotChange: writeSnapshotForToday,
                 onTasksSetChange: scheduleNotificationsIfPossible
             )
@@ -397,6 +401,11 @@ struct ContentView: View {
             }
             selectedTab = .today
             writeSnapshotForToday()
+
+        case .openJournal(let section):
+            selectedTab = .today
+            selectedDate = Calendar.current.startOfDay(for: Date())
+            focusedJournal = section
 
         case .completeTask(let slot, let value):
             applyCompletion(entry: entry, slot: slot, value: value)
