@@ -30,6 +30,13 @@ struct NotesCard: View {
             // Give the screen a moment to appear and scroll before taking focus.
             try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled else { return }
+            #if DEBUG
+            // Screenshot mode scrolls to the note but doesn't raise the keyboard.
+            if DemoMode.isEnabled {
+                onFocusHandled()
+                return
+            }
+            #endif
             isFocused = true
             onFocusHandled()
         }
