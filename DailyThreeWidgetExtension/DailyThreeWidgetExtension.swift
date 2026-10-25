@@ -2,615 +2,337 @@
 //  DailyThreeWidgetExtension.swift
 //  DailyThreeWidgetExtension
 //
-//  Created by Joe Casabona on 3/5/26.
+//  Today's Three: the three tasks with tappable check-offs, a progress ring, and optional journal notes.
 //
 
 import WidgetKit
 import SwiftUI
 import AppIntents
-import SwiftData
-import Foundation
-
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
-
-struct DailySnapshot {
-    let date: Date
-    var tasks: [String]
-    var completed: [Bool]
-    var theme: ThemeOption
-}
-
-struct DailySnapshotEntry: TimelineEntry {
-    let date: Date
-    let snapshot: DailySnapshot
-}
-
-struct DailySnapshotProvider: TimelineProvider {
-    func placeholder(in context: Context) -> DailySnapshotEntry {
-        DailySnapshotEntry(date: .now, snapshot: .placeholder)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (DailySnapshotEntry) -> Void) {
-        completion(DailySnapshotEntry(date: .now, snapshot: loadSnapshot() ?? .placeholder))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<DailySnapshotEntry>) -> Void) {
-        let entry = DailySnapshotEntry(date: .now, snapshot: loadSnapshot() ?? .placeholder)
-        let refresh = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now
-        completion(Timeline(entries: [entry], policy: .after(refresh)))
-    }
-
-    private func loadSnapshot() -> DailySnapshot? {
-        do {
-            let container = try WidgetStoreConfiguration.makeContainer()
-            let context = ModelContext(container)
-            let todayKey = DayEntry.makeDateKey(for: Date())
-            let descriptor = FetchDescriptor<DayEntry>(predicate: #Predicate { $0.dateKey == todayKey })
-            if let entry = try context.fetch(descriptor).first {
-                let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-                let theme = settings?.theme ?? .graphite
-                return DailySnapshot(date: entry.date,
-                                     tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
-                                     completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],
-                                     theme: theme)
-            }
-        } catch {
-            return nil
-        }
-        return nil
-    }
-}
-
-struct DailyThreeWidgetExtensionEntryView: View {
-    @Environment(\.widgetFamily) private var family
-    var entry: DailySnapshotProvider.Entry
-
-    var body: some View {
-        switch family {
-        case .systemSmall:
-            SmallWidgetView(snapshot: entry.snapshot)
-        case .systemMedium:
-            MediumWidgetView(snapshot: entry.snapshot)
-        case .systemLarge:
-            LargeWidgetView(snapshot: entry.snapshot)
-        #if os(iOS)
-        case .accessoryCircular:
-            AccessoryCircularView(snapshot: entry.snapshot)
-        case .accessoryRectangular:
-            AccessoryRectangularView(snapshot: entry.snapshot)
-        case .accessoryInline:
-            AccessoryInlineView(snapshot: entry.snapshot)
-        #endif
-        default:
-            MediumWidgetView(snapshot: entry.snapshot)
-        }
-    }
-}
 
 struct DailyThreeWidgetExtension: Widget {
+    // Kept from the first version so widgets people already placed keep working.
     let kind: String = "DailyThreeWidgetExtension"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: DailySnapshotProvider()) { entry in
-            DailyThreeWidgetExtensionEntryView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+        AppIntentConfiguration(kind: kind, intent: TodaysThreeConfiguration.self, provider: TodaysThreeProvider()) { entry in
+            TodaysThreeEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    WidgetPalette(option: entry.snapshot.theme).background
+                }
         }
-        .configurationDisplayName("Daily Three")
-        .description("See today’s three tasks and progress.")
-        .supportedFamilies({
-            var families: [WidgetFamily] = [
-                .systemSmall,
-                .systemMedium,
-                .systemLarge,
-            ]
-            #if os(iOS)
-            families += [
-                .accessoryCircular,
-                .accessoryRectangular,
-                .accessoryInline,
-            ]
-            #endif
-            return families
-        }())
+        .configurationDisplayName("Today's Three")
+        .description("Check off your three tasks, watch your progress, and jump into your journal.")
+        .supportedFamilies(Self.families)
+    }
+
+    private static var families: [WidgetFamily] {
+        var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge]
+        if #available(iOS 27.0, macOS 27.0, *) {
+            families.append(.systemExtraLargePortrait)
+        }
+        #if os(iOS)
+        families += [.accessoryCircular, .accessoryRectangular, .accessoryInline]
+        #endif
+        return families
     }
 }
 
-struct DailyThreeTasksWidget: Widget {
-    let kind: String = "DailyThreeTasksWidget"
+// MARK: - Entry view
 
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: DailySnapshotProvider()) { entry in
-            DailyThreeTasksWidgetEntryView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
-        }
-        .configurationDisplayName("Daily Three Tasks")
-        .description("See all three tasks at a glance.")
-        .supportedFamilies([.systemSmall])
-    }
-}
+struct TodaysThreeEntryView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: TodaysThreeEntry
 
-private struct DailyThreeTasksWidgetEntryView: View {
-    let entry: DailySnapshotEntry
+    private var snapshot: DailySnapshot { entry.snapshot }
+    private var palette: WidgetPalette { WidgetPalette(option: snapshot.theme) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Today’s Tasks")
-                .font(.headline)
-            if hasAnyTasks {
-                ForEach(0..<3, id: \.self) { index in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Circle()
-                            .fill(.secondary)
-                            .frame(width: 4, height: 4)
-                        Text(taskText(at: index))
-                            .font(.caption.bold())
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                }
-            } else {
-                Text("Add your tasks")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        content
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if #available(iOS 27.0, macOS 27.0, *), family == .systemExtraLargePortrait {
+            TodayPortraitView(snapshot: snapshot, palette: palette, showJournal: entry.showJournal)
+        } else {
+            switch family {
+            case .systemSmall:
+                TodaySmallView(snapshot: snapshot, palette: palette)
+            case .systemMedium:
+                TodayMediumView(snapshot: snapshot, palette: palette)
+            case .systemLarge:
+                TodayLargeView(snapshot: snapshot, palette: palette, showJournal: entry.showJournal)
+            case .systemExtraLarge:
+                TodayExtraLargeView(snapshot: snapshot, palette: palette, showJournal: entry.showJournal)
+            #if os(iOS)
+            case .accessoryCircular:
+                AccessoryCircularView(snapshot: snapshot)
+            case .accessoryRectangular:
+                AccessoryRectangularView(snapshot: snapshot)
+            case .accessoryInline:
+                AccessoryInlineView(snapshot: snapshot)
+            #endif
+            default:
+                TodayMediumView(snapshot: snapshot, palette: palette)
             }
-            Spacer(minLength: 0)
         }
-        .padding(12)
-    }
-
-    private var hasAnyTasks: Bool {
-        entry.snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
-
-    private func taskText(at index: Int) -> String {
-        let task = entry.snapshot.tasks[safe: index] ?? ""
-        return task.isEmpty ? "—" : task
     }
 }
 
-private struct SmallWidgetView: View {
+// MARK: - Pieces
+
+private extension DailySnapshot {
+    var dayText: String {
+        date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+    }
+
+    var shortDayText: String {
+        date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+}
+
+/// The ring with "1/3" in the middle.
+private struct CountRing: View {
     let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    var lineWidth: CGFloat = 8
+    var numberSize: CGFloat = 22
+
+    var body: some View {
+        WidgetProgressRing(progress: snapshot.progress, palette: palette, lineWidth: lineWidth) {
+            VStack(spacing: 0) {
+                Text("\(snapshot.completedCount)/3")
+                    .font(.system(size: numberSize, weight: .bold, design: .serif))
+                    .minimumScaleFactor(0.7)
+                if snapshot.isAllDone {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: numberSize * 0.5, weight: .semibold))
+                        .foregroundStyle(palette.accent)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Progress")
+        .accessibilityValue("\(snapshot.completedCount) of 3 done")
+    }
+}
+
+private struct TaskList: View {
+    let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    var checkSize: CGFloat = 20
+    var fontSize: CGFloat = 14
+    var lineLimit: Int = 2
+    var spacing: CGFloat = 9
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(0..<3, id: \.self) { index in
+                TaskRowButton(snapshot: snapshot, index: index, palette: palette,
+                              checkSize: checkSize, fontSize: fontSize, lineLimit: lineLimit)
+            }
+        }
+    }
+}
+
+private struct JournalPair: View {
+    let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    var lineLimit: Int = 3
+    var stacked = false
+
+    var body: some View {
+        if stacked {
+            VStack(spacing: 8) { blocks }
+        } else {
+            HStack(spacing: 8) { blocks }
+        }
+    }
+
+    @ViewBuilder
+    private var blocks: some View {
+        JournalBlock(title: "Progress", text: snapshot.progressNote, section: "progress", palette: palette, lineLimit: lineLimit)
+        JournalBlock(title: "Completion", text: snapshot.completionNote, section: "completion", palette: palette, lineLimit: lineLimit)
+    }
+}
+
+// MARK: - Small
+
+struct TodaySmallView: View {
+    let snapshot: DailySnapshot
+    let palette: WidgetPalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Daily Three")
-                .font(.headline)
-            Text(snapshot.date.formatted(date: .abbreviated, time: .omitted))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            if hasAnyTasks {
-                Text(primaryText)
-                    .font(.callout)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .foregroundStyle(.primary)
-                Text(secondaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Add your tasks")
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                Text("Open Daily Three to get started")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                WidgetTitle(text: "Today", size: 16)
+                Spacer()
+                if snapshot.hasAnyTasks {
+                    Text("\(snapshot.completedCount)/3")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(palette.accent)
+                        .widgetAccentable()
+                }
             }
+
+            if snapshot.hasAnyTasks {
+                TaskList(snapshot: snapshot, palette: palette, checkSize: 18, fontSize: 12.5, lineLimit: 2, spacing: 7)
+            } else {
+                EmptyTasksView(palette: palette, compact: true)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(12)
-    }
-
-    private var completedCount: Int {
-        snapshot.completed.filter { $0 }.count
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
-
-    private var primaryText: String {
-        if let index = snapshot.completed.firstIndex(where: { !$0 }) {
-            let task = snapshot.tasks[safe: index] ?? ""
-            return task.isEmpty ? "Top task not set" : task
-        }
-        return "All tasks complete"
-    }
-
-    private var secondaryText: String {
-        "Completed: \(completedCount)/3"
     }
 }
 
-private struct MediumWidgetView: View {
+// MARK: - Medium
+
+struct TodayMediumView: View {
     let snapshot: DailySnapshot
+    let palette: WidgetPalette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Daily Three")
-                    .font(.headline)
-                Spacer()
-                if hasAnyTasks {
-                    Text("\(completedCount)/3")
-                        .font(.caption)
+        if snapshot.hasAnyTasks {
+            HStack(spacing: 16) {
+                VStack(spacing: 6) {
+                    CountRing(snapshot: snapshot, palette: palette, lineWidth: 9, numberSize: 22)
+                        .frame(width: 88, height: 88)
+                    Text(snapshot.shortDayText)
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
-            }
-
-            if hasAnyTasks {
-                ForEach(0..<3, id: \.self) { index in
-                    TaskLine(text: snapshot.tasks[safe: index] ?? "",
-                             isDone: snapshot.completed[safe: index] ?? false,
-                             intent: ToggleTaskIntent(index: index))
-                }
-            } else {
-                Text("Add your tasks")
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                Text("Open Daily Three to get started")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(14)
-    }
-
-    private var completedCount: Int {
-        snapshot.completed.filter { $0 }.count
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
-}
-
-#if os(iOS)
-private struct AccessoryCircularView: View {
-    let snapshot: DailySnapshot
-
-    var body: some View {
-        ZStack {
-            if hasAnyTasks {
-                Gauge(value: Double(completedCount), in: 0...3) {
-                    Text("Tasks")
-                }
-                .gaugeStyle(.accessoryCircular)
-                .tint(.primary)
-                Text("\(remainingCount)")
-                    .font(.title2).bold()
-                    .minimumScaleFactor(0.5)
-            } else {
-                Text("Add\ntasks")
-                    .font(.caption2)
-                    .multilineTextAlignment(.center)
-            }
-        }
-    }
-
-    private var completedCount: Int {
-        snapshot.completed.filter { $0 }.count
-    }
-
-    private var remainingCount: Int {
-        max(0, 3 - completedCount)
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
-}
-#endif
-
-private struct LargeWidgetView: View {
-    let snapshot: DailySnapshot
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Daily Three")
-                    .font(.headline)
-                Spacer()
-                Text(snapshot.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-
-            if hasAnyTasks {
-                ProgressRing(progress: progress, tint: themeAccentColor(snapshot.theme))
-                    .frame(height: 165)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(0..<3, id: \.self) { index in
-                        TaskLine(text: snapshot.tasks[safe: index] ?? "",
-                                 isDone: snapshot.completed[safe: index] ?? false,
-                                 intent: ToggleTaskIntent(index: index))
-                    }
+                    WidgetTitle(text: "Today's Three", size: 15)
+                    TaskList(snapshot: snapshot, palette: palette, checkSize: 20, fontSize: 13.5, lineLimit: 1, spacing: 8)
+                    Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Spacer(minLength: 20)
-                Text("Add your tasks")
-                    .font(.title3)
-                    .foregroundStyle(.primary)
-                Text("Open Daily Three to get started")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
             }
+        } else {
+            EmptyTasksView(palette: palette)
         }
-        .padding(12)
-    }
-
-    private var progress: Double {
-        guard !snapshot.completed.isEmpty else { return 0 }
-        let completed = snapshot.completed.filter { $0 }.count
-        return Double(completed) / 3.0
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 
-#if os(iOS)
-private struct AccessoryRectangularView: View {
+// MARK: - Large
+
+struct TodayLargeView: View {
     let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    let showJournal: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if hasAnyTasks {
-                ForEach(0..<3, id: \.self) { index in
-                    HStack(spacing: 6) {
-                        Image(systemName: isDone(at: index) ? "checkmark.circle.fill" : "circle")
-                            .font(.caption2)
-                            .foregroundStyle(isDone(at: index) ? .primary : .secondary)
-                        Text(taskText(at: index))
-                            .font(.caption2.bold())
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+        if snapshot.hasAnyTasks {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 14) {
+                    CountRing(snapshot: snapshot, palette: palette, lineWidth: 8, numberSize: 19)
+                        .frame(width: 70, height: 70)
+                    VStack(alignment: .leading, spacing: 2) {
+                        WidgetTitle(text: "Today's Three", size: 20)
+                        Text(snapshot.dayText)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
                     }
-                    if index < 2 {
-                        Rectangle()
-                            .fill(.secondary.opacity(0.35))
-                            .frame(height: 1)
-                    }
+                    Spacer(minLength: 0)
                 }
-            } else {
-                Text("Add your tasks")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+
+                TaskList(snapshot: snapshot, palette: palette, checkSize: 24, fontSize: 15, lineLimit: 2, spacing: 12)
+
+                if showJournal {
+                    JournalPair(snapshot: snapshot, palette: palette, lineLimit: 4)
+                        .frame(maxHeight: .infinity)
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
+        } else {
+            EmptyTasksView(palette: palette)
         }
-    }
-
-    private func taskText(at index: Int) -> String {
-        let task = snapshot.tasks[safe: index] ?? ""
-        return task.isEmpty ? "—" : task
-    }
-
-    private func isDone(at index: Int) -> Bool {
-        snapshot.completed[safe: index] ?? false
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 
-private struct AccessoryInlineView: View {
+// MARK: - Extra large (iPad and Mac)
+
+struct TodayExtraLargeView: View {
     let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    let showJournal: Bool
 
     var body: some View {
-        if hasAnyTasks {
-            Text("Daily Three: \(completedCount)/3 done")
+        if snapshot.hasAnyTasks {
+            HStack(spacing: 26) {
+                VStack(spacing: 10) {
+                    CountRing(snapshot: snapshot, palette: palette, lineWidth: 14, numberSize: 38)
+                        .frame(width: 170, height: 170)
+                    Text(snapshot.dayText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxHeight: .infinity)
+
+                VStack(alignment: .leading, spacing: 18) {
+                    WidgetTitle(text: "Today's Three", size: 26)
+                    TaskList(snapshot: snapshot, palette: palette, checkSize: 30, fontSize: 19, lineLimit: 2, spacing: 20)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+                if showJournal {
+                    JournalPair(snapshot: snapshot, palette: palette, lineLimit: 8, stacked: true)
+                        .frame(width: 250)
+                }
+            }
         } else {
-            Text("Daily Three: add tasks")
+            EmptyTasksView(palette: palette)
         }
     }
-
-    private var completedCount: Int {
-        snapshot.completed.filter { $0 }.count
-    }
-
-    private var hasAnyTasks: Bool {
-        snapshot.tasks.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
 }
-#endif
 
-private struct TaskLine: View {
-    let text: String
-    let isDone: Bool
-    let intent: ToggleTaskIntent?
+// MARK: - Extra large portrait (iPhone Duo)
+
+@available(iOS 27.0, macOS 27.0, *)
+struct TodayPortraitView: View {
+    let snapshot: DailySnapshot
+    let palette: WidgetPalette
+    let showJournal: Bool
 
     var body: some View {
-        if #available(iOS 17.0, macOS 14.0, *), let intent {
-            Button(intent: intent) {
-                TaskLineContent(text: text, isDone: isDone)
+        if snapshot.hasAnyTasks {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
+                    CountRing(snapshot: snapshot, palette: palette, lineWidth: 11, numberSize: 26)
+                        .frame(width: 110, height: 110)
+                    VStack(alignment: .leading, spacing: 3) {
+                        WidgetTitle(text: "Today's Three", size: 22)
+                        Text(snapshot.dayText)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                TaskList(snapshot: snapshot, palette: palette, checkSize: 26, fontSize: 16, lineLimit: 2, spacing: 14)
+
+                if showJournal {
+                    JournalPair(snapshot: snapshot, palette: palette, lineLimit: 6, stacked: true)
+                        .frame(maxHeight: .infinity)
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
-            .buttonStyle(.plain)
         } else {
-            TaskLineContent(text: text, isDone: isDone)
+            EmptyTasksView(palette: palette)
         }
     }
 }
 
-private struct TaskLineContent: View {
-    let text: String
-    let isDone: Bool
+// MARK: - Previews
 
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
-            Text(text.isEmpty ? "–" : text)
-                .font(.callout)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
-        .foregroundStyle(isDone ? .primary : .secondary)
-    }
-}
-
-private struct ProgressChip: View {
-    let completed: Int
-    let total: Int
-
-    var body: some View {
-        Text("\(completed)/\(total) done")
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.thinMaterial, in: Capsule())
-    }
-}
-
-private struct ProgressRing: View {
-    let progress: Double
-    let tint: Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(.secondary.opacity(0.25), lineWidth: 10)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(percentText)
-                .font(.title2)
-        }
-        .accessibilityLabel("Completion")
-        .accessibilityValue(percentText)
-    }
-
-    private var percentText: String {
-        let value = Int(round(progress * 100))
-        return "\(value)%"
-    }
-}
-
-private func themeAccentColor(_ option: ThemeOption) -> Color {
-    #if os(iOS)
-    return Color(uiColor: UIColor { trait in
-        let isDark = trait.userInterfaceStyle == .dark
-        switch option {
-        case .sunrise:
-            return isDark
-            ? UIColor(red: 0.969, green: 0.839, blue: 0.467, alpha: 1)
-            : UIColor(red: 0.580, green: 0.502, blue: 0.278, alpha: 1)
-        case .ocean:
-            return isDark
-            ? UIColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
-            : UIColor(red: 0.031, green: 0.173, blue: 0.271, alpha: 1)
-        case .forest:
-            return isDark
-            ? UIColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
-            : UIColor(red: 0.18, green: 0.54, blue: 0.34, alpha: 1)
-        case .graphite:
-            return isDark
-            ? UIColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
-            : UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)
-        }
-    })
-    #else
-    return Color(nsColor: NSColor(name: nil) { appearance in
-        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        switch option {
-        case .sunrise:
-            return isDark
-            ? NSColor(red: 0.969, green: 0.839, blue: 0.467, alpha: 1)
-            : NSColor(red: 0.580, green: 0.502, blue: 0.278, alpha: 1)
-        case .ocean:
-            return isDark
-            ? NSColor(red: 0.46, green: 0.73, blue: 0.92, alpha: 1)
-            : NSColor(red: 0.031, green: 0.173, blue: 0.271, alpha: 1)
-        case .forest:
-            return isDark
-            ? NSColor(red: 0.50, green: 0.78, blue: 0.60, alpha: 1)
-            : NSColor(red: 0.18, green: 0.54, blue: 0.34, alpha: 1)
-        case .graphite:
-            return isDark
-            ? NSColor(red: 0.72, green: 0.73, blue: 0.76, alpha: 1)
-            : NSColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)
-        }
-    })
-    #endif
-}
-
-private extension DailySnapshot {
-    static var placeholder: DailySnapshot {
-        DailySnapshot(date: .now,
-                      tasks: ["Task 1", "Task 2", "Task 3"],
-                      completed: [false, true, false],
-                      theme: .graphite)
-    }
-}
-
-struct ToggleTaskIntent: AppIntent {
-    static var title: LocalizedStringResource = "Toggle Task"
-
-    @Parameter(title: "Task Index")
-    var index: Int
-
-    init() {}
-
-    init(index: Int) {
-        self.index = index
-    }
-
-    func perform() async throws -> some IntentResult {
-        guard updateSharedStore() != nil else { return .result() }
-        WidgetCenter.shared.reloadAllTimelines()
-        return .result()
-    }
-
-    private func updateSharedStore() -> DailySnapshot? {
-        do {
-            let container = try WidgetStoreConfiguration.makeContainer()
-            let context = ModelContext(container)
-            let todayKey = DayEntry.makeDateKey(for: Date())
-            let descriptor = FetchDescriptor<DayEntry>(predicate: #Predicate { $0.dateKey == todayKey })
-            let entry = try context.fetch(descriptor).first ?? DayEntry(date: Date())
-            if entry.modelContext == nil {
-                context.insert(entry)
-            }
-
-            switch index {
-            case 0:
-                entry.taskOneDone.toggle()
-            case 1:
-                entry.taskTwoDone.toggle()
-            case 2:
-                entry.taskThreeDone.toggle()
-            default:
-                break
-            }
-
-            try context.save()
-
-            let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-            let theme = settings?.theme ?? .graphite
-            return DailySnapshot(date: entry.date,
-                                 tasks: [entry.taskOne, entry.taskTwo, entry.taskThree],
-                                 completed: [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone],
-                                 theme: theme)
-        } catch {
-            return nil
-        }
-    }
-}
-
-#Preview(as: .systemSmall) {
+#Preview("Today's Three", as: .systemSmall) {
     DailyThreeWidgetExtension()
 } timeline: {
-    DailySnapshotEntry(date: .now, snapshot: .placeholder)
+    TodaysThreeEntry(date: .now, snapshot: .sample, showJournal: true)
+    TodaysThreeEntry(date: .now, snapshot: DailySnapshot.sample.with(theme: .ocean), showJournal: true)
+    TodaysThreeEntry(date: .now, snapshot: DailySnapshot.sample.with(theme: .sunrise), showJournal: true)
+    TodaysThreeEntry(date: .now, snapshot: DailySnapshot.sample.with(theme: .forest), showJournal: true)
+    TodaysThreeEntry(date: .now, snapshot: .empty(theme: .graphite), showJournal: true)
 }

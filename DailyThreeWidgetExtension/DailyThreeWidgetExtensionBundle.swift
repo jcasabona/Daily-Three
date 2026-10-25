@@ -12,6 +12,7 @@ import SwiftUI
 struct DailyThreeWidgetExtensionBundle: WidgetBundle {
     var body: some Widget {
         DailyThreeWidgetExtension()
-        DailyThreeTasksWidget()
+        NextUpWidget()
+        JournalWidget()
     }
 }
