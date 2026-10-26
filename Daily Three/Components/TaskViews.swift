@@ -204,7 +204,8 @@ private struct TaskRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.trailing, handleClearance)
-        .padding(.vertical, 7)
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) { Divider() }
         .overlay(alignment: .trailing) {
             if showsDragHandle {
                 Image(systemName: "line.3.horizontal")

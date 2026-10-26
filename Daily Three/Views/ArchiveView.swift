@@ -95,11 +95,11 @@ private struct ArchiveDetailView: View {
                 TaskListCard(entry: entryBinding, theme: theme, isEditable: false, showDragHandles: false)
 
                 if !entry.progressNote.isEmpty {
-                    NotesCard(title: "Progress", prompt: "", text: progressBinding, theme: theme, isEditable: false)
+                    NotesCard(title: "Checking in throughout the day", prompt: "", text: progressBinding, theme: theme, isEditable: false)
                 }
 
                 if !entry.completionNote.isEmpty {
-                    NotesCard(title: "Completion", prompt: "", text: completionBinding, theme: theme, isEditable: false)
+                    NotesCard(title: "End of the day check-in", prompt: "", text: completionBinding, theme: theme, isEditable: false)
                 }
             }
             .padding(16)

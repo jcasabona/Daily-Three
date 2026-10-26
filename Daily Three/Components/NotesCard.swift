@@ -50,8 +50,11 @@ struct NotesCard: View {
                 TextEditor(text: $text)
                     .focused($isFocused)
                     .frame(minHeight: 110)
+                    .padding(8)
                     .font(.system(size: 15))
                     .scrollContentBackground(.hidden)
+                    .background(theme.inset)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else {
                 Text(text)
                     .font(.system(size: 15))
