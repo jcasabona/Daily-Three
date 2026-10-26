@@ -2,7 +2,7 @@
 //  JournalWidget.swift
 //  DailyThreeWidgetExtension
 //
-//  Journal: today's Progress and Completion notes. Tapping a note opens the app to write it.
+//  Journal: today's Progress and End of Day notes. Tapping a note opens the app to write it.
 //
 
 import WidgetKit
@@ -19,7 +19,7 @@ struct JournalWidget: Widget {
                 }
         }
         .configurationDisplayName("Journal")
-        .description("Your Progress and Completion notes for today. Tap one to write.")
+        .description("Your Progress and End of Day notes for today. Tap one to write.")
         .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
@@ -53,7 +53,7 @@ struct JournalEntryView: View {
     @ViewBuilder
     private var blocks: some View {
         JournalBlock(title: "Progress", text: snapshot.progressNote, section: "progress", palette: palette, lineLimit: isLarge ? 9 : 5)
-        JournalBlock(title: "Completion", text: snapshot.completionNote, section: "completion", palette: palette, lineLimit: isLarge ? 9 : 5)
+        JournalBlock(title: "End of Day", text: snapshot.completionNote, section: "completion", palette: palette, lineLimit: isLarge ? 9 : 5)
     }
 }
 

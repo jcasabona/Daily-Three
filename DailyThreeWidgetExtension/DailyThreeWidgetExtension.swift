@@ -152,7 +152,7 @@ private struct JournalPair: View {
     @ViewBuilder
     private var blocks: some View {
         JournalBlock(title: "Progress", text: snapshot.progressNote, section: "progress", palette: palette, lineLimit: lineLimit)
-        JournalBlock(title: "Completion", text: snapshot.completionNote, section: "completion", palette: palette, lineLimit: lineLimit)
+        JournalBlock(title: "End of Day", text: snapshot.completionNote, section: "completion", palette: palette, lineLimit: lineLimit)
     }
 }
 
