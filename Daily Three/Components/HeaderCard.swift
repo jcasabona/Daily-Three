@@ -16,9 +16,11 @@ struct HeaderCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 30, weight: .bold, design: .serif))
-                Text(subtitle)
-                    .font(.system(.body))
-                    .foregroundStyle(.secondary)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(.body))
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {

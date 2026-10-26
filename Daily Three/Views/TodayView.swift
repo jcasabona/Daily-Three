@@ -36,7 +36,7 @@ struct TodayView: View {
     }
 
     private var subtitle: String {
-        editingMode == .today ? "Your three tasks" : "Plan ahead"
+        editingMode == .today ? "" : "Plan ahead"
     }
 
     private var showCheckboxes: Bool {
@@ -59,11 +59,11 @@ struct TodayView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            NotesCard(title: "Progress", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme,
+            NotesCard(title: "Checking in throughout the day", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme,
                       focusRequested: focusedJournal == .progress, onFocusHandled: { focusedJournal = nil })
                 .id(JournalSection.progress)
 
-            NotesCard(title: "Completion", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme,
+            NotesCard(title: "End of the day check-in", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme,
                       focusRequested: focusedJournal == .completion, onFocusHandled: { focusedJournal = nil })
                 .id(JournalSection.completion)
         }
