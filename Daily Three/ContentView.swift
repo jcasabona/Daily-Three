@@ -204,7 +204,14 @@ struct ContentView: View {
     private var usesSidebar: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
             && horizontalSizeClass == .regular
-            && min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) >= 820
+            && shortScreenSide >= 820
+    }
+
+    /// The shorter side of the screen this app is on, whatever size its window is.
+    private var shortScreenSide: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        guard let bounds = scene?.screen.bounds else { return 0 }
+        return min(bounds.width, bounds.height)
     }
 
     @ViewBuilder
