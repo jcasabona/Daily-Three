@@ -34,6 +34,7 @@ struct ArchiveView: View {
         #else
         .listStyle(.inset)
         #endif
+        .onAppear { selectNewestIfDemoRequested() }
     }
 
     @ViewBuilder
@@ -92,6 +93,15 @@ struct ArchiveView: View {
         .tint(theme.accent)
     }
     #endif
+
+    /// Screenshot mode only: pick the newest day so a wide window shows a detail pane, not the placeholder.
+    private func selectNewestIfDemoRequested() {
+        #if DEBUG
+        if DemoMode.isEnabled, ProcessInfo.processInfo.environment["DEMO_ARCHIVE_SELECT"] == "1", selectedID == nil {
+            selectedID = entries.first?.id
+        }
+        #endif
+    }
 
     private func summary(for entry: DayEntry) -> String {
         let completed = [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone].filter { $0 }.count

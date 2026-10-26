@@ -277,6 +277,9 @@ struct ContentView: View {
             guard !Task.isCancelled else { return }
             await syncTodoist()
         }
+        #if DEBUG
+        .task { await applyDemoStartState() }
+        #endif
         // While the app stays open, pick up changes made in Todoist.
         .task(id: scenePhase) {
             while !Task.isCancelled {
@@ -339,6 +342,10 @@ struct ContentView: View {
     }
 
     private func requestNotificationsIfNeeded() {
+        #if DEBUG
+        // The permission prompt would cover App Store screenshots.
+        if DemoMode.isEnabled { return }
+        #endif
         NotificationScheduler.shared.requestAuthorizationIfNeeded()
     }
 
@@ -354,6 +361,23 @@ struct ContentView: View {
             .joined(separator: "#")
         return "\(todoist.isConnected)|\(scenePhase == .active)|\(settings?.todoistCreatesTasks ?? true)|\(settings?.todoistProjectID ?? "")|\(slots)"
     }
+
+    #if DEBUG
+    /// Screenshot mode: jump to a tab (DEMO_TAB) or into a journal note (DEMO_JOURNAL) shortly after launch.
+    private func applyDemoStartState() async {
+        guard DemoMode.isEnabled else { return }
+        let environment = ProcessInfo.processInfo.environment
+        try? await Task.sleep(for: .seconds(1.5))
+        if let name = environment["DEMO_TAB"], let tab = AppTab(urlValue: name) {
+            selectedTab = tab
+        }
+        if let name = environment["DEMO_JOURNAL"], let section = JournalSection(rawValue: name) {
+            selectedTab = .today
+            try? await Task.sleep(for: .seconds(0.6))
+            focusedJournal = section
+        }
+    }
+    #endif
 
     private func syncTodoist() async {
         guard todoist.isConnected, scenePhase == .active else { return }

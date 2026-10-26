@@ -15,6 +15,10 @@ struct Daily_ThreeApp: App {
     @State private var todoist = TodoistSyncService()
 
     var sharedModelContainer: ModelContainer = {
+        #if DEBUG
+        // Screenshot mode: clean in-memory sample data, never the real store.
+        if DemoMode.isEnabled { return DemoMode.makeContainer() }
+        #endif
         let schema = Schema([
             DayEntry.self,
             AppSettings.self,
