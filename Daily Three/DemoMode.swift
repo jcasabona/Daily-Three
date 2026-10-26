@@ -50,7 +50,7 @@ enum DemoMode {
 
         let today = DayEntry(date: Date())
         today.taskOne = "Finish the launch plan"
-        today.taskTwo = "Send the Tuesday newsletter"
+        today.taskTwo = "Send the newsletter"
         today.taskThree = "Take a long walk"
         today.taskOneDone = doneCount >= 1
         today.taskTwoDone = doneCount >= 2
