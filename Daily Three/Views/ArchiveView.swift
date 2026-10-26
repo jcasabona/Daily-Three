@@ -10,6 +10,7 @@ struct ArchiveView: View {
     let entries: [DayEntry]
     let theme: ThemePalette
     @State private var selectedID: DayEntry.ID?
+    @Environment(\.usesSidebar) private var usesSidebar
 
     private var selectedEntry: DayEntry? {
         entries.first { $0.id == selectedID }
@@ -29,7 +30,7 @@ struct ArchiveView: View {
             }
         }
         #if os(iOS)
-        .listStyle(.insetGrouped)
+        .modifier(ArchiveListStyle(flat: usesSidebar, theme: theme))
         #else
         .listStyle(.inset)
         #endif
@@ -48,7 +49,33 @@ struct ArchiveView: View {
 
     var body: some View {
         #if os(iOS)
-        // Collapses to list → push on narrow screens and shows both panes when there is room.
+        if usesSidebar {
+            // Already inside the app's sidebar, so a second split view would nest; lay the panes out side by side.
+            HStack(spacing: 0) {
+                listContent
+                    .frame(width: 320)
+                Divider()
+                detailContent
+                    .frame(maxWidth: .infinity)
+            }
+            .tint(theme.accent)
+        } else {
+            phoneLayout
+        }
+        #else
+        HSplitView {
+            listContent
+                .frame(minWidth: 240, idealWidth: 300, maxWidth: 420)
+            detailContent
+                .frame(minWidth: 320, maxWidth: .infinity)
+        }
+        .tint(theme.accent)
+        #endif
+    }
+
+    #if os(iOS)
+    // Collapses to list → push on narrow screens and shows both panes when there is room.
+    private var phoneLayout: some View {
         NavigationSplitView {
             listContent
                 .navigationTitle("Archive")
@@ -63,16 +90,8 @@ struct ArchiveView: View {
             detailContent
         }
         .tint(theme.accent)
-        #else
-        HSplitView {
-            listContent
-                .frame(minWidth: 240, idealWidth: 300, maxWidth: 420)
-            detailContent
-                .frame(minWidth: 320, maxWidth: .infinity)
-        }
-        .tint(theme.accent)
-        #endif
     }
+    #endif
 
     private func summary(for entry: DayEntry) -> String {
         let completed = [entry.taskOneDone, entry.taskTwoDone, entry.taskThreeDone].filter { $0 }.count
@@ -83,6 +102,7 @@ struct ArchiveView: View {
 private struct ArchiveDetailView: View {
     @Bindable var entry: DayEntry
     let theme: ThemePalette
+    @Environment(\.usesSidebar) private var usesSidebar
 
     var body: some View {
         let entryBinding = Binding<DayEntry>(get: { entry }, set: { _ in })
@@ -108,5 +128,26 @@ private struct ArchiveDetailView: View {
         }
         .background(theme.background)
         .navigationTitle("Details")
+        #if os(iOS)
+        .toolbar(usesSidebar ? .hidden : .automatic, for: .navigationBar)
+        #endif
     }
 }
+
+#if os(iOS)
+/// The phone keeps the grouped list; the iPad sidebar layout uses a plain one to match the Mac.
+private struct ArchiveListStyle: ViewModifier {
+    let flat: Bool
+    let theme: ThemePalette
+
+    func body(content: Content) -> some View {
+        if flat {
+            content.listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .background(theme.background)
+        } else {
+            content.listStyle(.insetGrouped)
+        }
+    }
+}
+#endif

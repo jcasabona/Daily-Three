@@ -47,6 +47,9 @@ struct NextUpEntryView: View {
 private struct CheckNextButton: View {
     let palette: WidgetPalette
     var compact = false
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var isFullColor: Bool { renderingMode == .fullColor }
 
     var body: some View {
         Button(intent: CompleteNextTaskIntent()) {
@@ -56,11 +59,19 @@ private struct CheckNextButton: View {
                 Text("Done")
                     .font(.system(size: compact ? 14 : 18, weight: .bold))
             }
-            .foregroundStyle(palette.onAccent)
+            // Full color: text on the accent fill, picked for contrast. Tinted modes (StandBy, Lock Screen) recolor
+            // an accentable view as one color, which would make text and fill match, so they get an outline and
+            // primary-colored text instead.
+            .foregroundStyle(isFullColor ? palette.onAccent : Color.primary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, compact ? 9 : 14)
-            .background(palette.accent, in: Capsule())
-            .widgetAccentable()
+            .background {
+                if isFullColor {
+                    Capsule().fill(palette.accent).widgetAccentable()
+                } else {
+                    Capsule().strokeBorder(Color.primary, lineWidth: 2)
+                }
+            }
         }
         .buttonStyle(.plain)
     }

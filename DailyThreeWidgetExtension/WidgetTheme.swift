@@ -101,20 +101,28 @@ struct WidgetCheck: View {
     let isDone: Bool
     let palette: WidgetPalette
     var size: CGFloat = 20
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
         ZStack {
-            if isDone {
+            if isDone && renderingMode == .fullColor {
                 Circle().fill(palette.accent)
                 Image(systemName: "checkmark")
                     .font(.system(size: size * 0.5, weight: .bold))
                     .foregroundStyle(palette.onAccent)
+            } else if isDone {
+                // Tinted modes (StandBy, Lock Screen, accented Home Screen) paint a whole accentable view one color,
+                // so a filled circle would swallow its own checkmark. Outline it instead.
+                Circle().strokeBorder(.primary, lineWidth: max(1.5, size * 0.09))
+                Image(systemName: "checkmark")
+                    .font(.system(size: size * 0.5, weight: .bold))
+                    .foregroundStyle(.primary)
             } else {
                 Circle().strokeBorder(.secondary.opacity(0.55), lineWidth: max(1.5, size * 0.09))
             }
         }
         .frame(width: size, height: size)
-        .widgetAccentable(isDone)
+        .widgetAccentable(isDone && renderingMode == .fullColor)
     }
 }
 

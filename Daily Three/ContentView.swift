@@ -45,6 +45,10 @@ struct ContentView: View {
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
     /// Set by the widgets' Journal buttons; Today moves to and focuses that note, then clears it.
     @State private var focusedJournal: JournalSection?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     private var todayKey: String {
         DayEntry.makeDateKey(for: Date())
@@ -82,7 +86,6 @@ struct ContentView: View {
         return entries.filter { $0.dateKey <= key }
     }
 
-    #if os(macOS)
     private var sidebarSelection: Binding<AppTab?> {
         Binding(get: { selectedTab }, set: { if let tab = $0 { selectedTab = tab } })
     }
@@ -118,8 +121,8 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
     }
 
-    private var mainContainer: some View {
-        NavigationSplitView {
+    private var sidebarContainer: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
             Group {
@@ -145,13 +148,17 @@ struct ContentView: View {
                     }
                 }
             }
+            #if os(macOS)
             .toolbar(removing: .title)
+            #endif
         }
+        .navigationSplitViewStyle(.balanced)
         .environment(\.surfaceStyle, .flat)
+        .environment(\.usesSidebar, true)
         .tint(currentTheme().accent)
     }
-    #else
-    private var mainContainer: some View {
+
+    private var tabContainer: some View {
         TabView(selection: $selectedTab) {
             TodayView(
                 entry: bindingForEntry(on: selectedDate),
@@ -191,6 +198,28 @@ struct ContentView: View {
         .environment(\.surfaceStyle, .flat)
         .tint(currentTheme().accent)
     }
+
+    #if os(iOS)
+    /// iPads 11" and up get the Mac's sidebar layout; iPhones and smaller or narrow iPad windows keep the tab bar.
+    private var usesSidebar: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+            && horizontalSizeClass == .regular
+            && shortScreenSide >= 820
+    }
+
+    /// The shorter side of the screen this app is on, whatever size its window is.
+    private var shortScreenSide: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        guard let bounds = scene?.screen.bounds else { return 0 }
+        return min(bounds.width, bounds.height)
+    }
+
+    @ViewBuilder
+    private var mainContainer: some View {
+        if usesSidebar { sidebarContainer } else { tabContainer }
+    }
+    #else
+    private var mainContainer: some View { sidebarContainer }
     #endif
 
     var body: some View {
