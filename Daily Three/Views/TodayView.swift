@@ -18,6 +18,7 @@ struct TodayView: View {
     @State private var lastHasAllTasksSet: Bool?
     @State private var availableWidth: CGFloat = 0
     @Environment(\.surfaceStyle) private var style
+    @Environment(\.usesSidebar) private var usesSidebar
 
     private var sectionSpacing: CGFloat { style == .flat ? 28 : 16 }
     private var horizontalPadding: CGFloat {
@@ -104,7 +105,18 @@ struct TodayView: View {
     }
 
     #if os(iOS)
+    @ViewBuilder
     private var viewContainer: some View {
+        if usesSidebar {
+            scrollContent
+                .padding(.top, 24)
+                .background(theme.background)
+        } else {
+            navigationContainer
+        }
+    }
+
+    private var navigationContainer: some View {
         NavigationStack {
             scrollContent
                 .background(theme.background)

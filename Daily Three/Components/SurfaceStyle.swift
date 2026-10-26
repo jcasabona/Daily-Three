@@ -13,6 +13,8 @@ enum SurfaceStyle {
 
 extension EnvironmentValues {
     @Entry var surfaceStyle: SurfaceStyle = .card
+    /// True inside the Mac-style sidebar layout (Mac, and iPads 11" and up), where screens skip their own navigation chrome.
+    @Entry var usesSidebar: Bool = false
 }
 
 /// Accent-colored section title with a thin rule underneath, used by the flat style.
