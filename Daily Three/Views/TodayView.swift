@@ -20,7 +20,11 @@ struct TodayView: View {
     @Environment(\.surfaceStyle) private var style
 
     private var sectionSpacing: CGFloat { style == .flat ? 28 : 16 }
-    private var horizontalPadding: CGFloat { style == .flat ? 36 : 16 }
+    private var horizontalPadding: CGFloat {
+        guard style == .flat else { return 16 }
+        // Narrow screens (iPhone, split view) get tighter margins than a Mac window or full iPad.
+        return availableWidth > 0 && availableWidth < Self.twoColumnMinWidth ? 20 : 36
+    }
 
     /// Width at which Today puts tasks and notes side by side instead of stacking them.
     private static let twoColumnMinWidth: CGFloat = 640

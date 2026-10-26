@@ -33,6 +33,12 @@ struct ThemePalette {
         dynamicColor(light: palette.fieldLight, dark: palette.fieldDark)
     }
 
+    /// A slightly darker version of the background, for text areas in the flat style (no border).
+    var inset: Color {
+        dynamicColor(light: PlatformColor.black.withAlphaComponent(0.05),
+                     dark: PlatformColor.black.withAlphaComponent(0.28))
+    }
+
     var border: Color {
         dynamicColor(light: palette.borderLight, dark: palette.borderDark)
     }

@@ -188,6 +188,7 @@ struct ContentView: View {
                     .tag(AppTab.settings)
             }
         }
+        .environment(\.surfaceStyle, .flat)
         .tint(currentTheme().accent)
     }
     #endif
