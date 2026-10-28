@@ -19,6 +19,9 @@ struct TodayView: View {
     @State private var availableWidth: CGFloat = 0
     @Environment(\.surfaceStyle) private var style
     @Environment(\.usesSidebar) private var usesSidebar
+    @Environment(\.foldPosture) private var posture
+    /// The note the keyboard is up for, if any. In laptop mode that note takes over the screen.
+    @State private var activeNote: JournalSection?
 
     private var sectionSpacing: CGFloat { style == .flat ? 28 : 16 }
     private var horizontalPadding: CGFloat {
@@ -58,19 +61,76 @@ struct TodayView: View {
         }
     }
 
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: sectionSpacing) {
-            NotesCard(title: "Checking in throughout the day", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme,
-                      focusRequested: focusedJournal == .progress, onFocusHandled: { focusedJournal = nil })
-                .id(JournalSection.progress)
+    /// Laptop mode: the top half is tasks, the bottom half is the journal.
+    private var isLaptop: Bool { posture == .laptop && editingMode == .today }
 
-            NotesCard(title: "End of the day check-in", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme,
-                      focusRequested: focusedJournal == .completion, onFocusHandled: { focusedJournal = nil })
-                .id(JournalSection.completion)
+    private func isActive(_ section: JournalSection) -> Bool { isLaptop && activeNote == section }
+    private func isHidden(_ section: JournalSection) -> Bool { isLaptop && activeNote != nil && activeNote != section }
+
+    private func noteFocusChanged(_ section: JournalSection, _ focused: Bool) {
+        if focused {
+            activeNote = section
+        } else if activeNote == section {
+            activeNote = nil
         }
     }
 
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            NotesCard(title: "Checking in throughout the day", prompt: "How are you progressing on your tasks?", text: $entry.progressNote, theme: theme,
+                      focusRequested: focusedJournal == .progress, onFocusHandled: { focusedJournal = nil },
+                      onFocusChange: { noteFocusChanged(.progress, $0) }, expands: isActive(.progress))
+                .id(JournalSection.progress)
+                .frame(maxHeight: isHidden(.progress) ? 0 : (isActive(.progress) ? .infinity : nil))
+                .opacity(isHidden(.progress) ? 0 : 1)
+                .clipped()
+
+            NotesCard(title: "End of the day check-in", prompt: "Did you complete your tasks?", text: $entry.completionNote, theme: theme,
+                      focusRequested: focusedJournal == .completion, onFocusHandled: { focusedJournal = nil },
+                      onFocusChange: { noteFocusChanged(.completion, $0) }, expands: isActive(.completion))
+                .id(JournalSection.completion)
+                .frame(maxHeight: isHidden(.completion) ? 0 : (isActive(.completion) ? .infinity : nil))
+                .opacity(isHidden(.completion) ? 0 : 1)
+                .clipped()
+        }
+    }
+
+    /// Half-folded like a laptop: tasks above the crease, journal below. With the keyboard up, the note being
+    /// typed in takes the whole screen. Both halves stay in the view tree so the text field keeps its focus.
+    private var laptopContent: some View {
+        let keyboardUp = activeNote != nil
+        return VStack(spacing: 0) {
+            ScrollView {
+                planningSection
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.bottom, 12)
+            }
+            .frame(maxHeight: keyboardUp ? 0 : .infinity)
+            .opacity(keyboardUp ? 0 : 1)
+            .clipped()
+
+            Divider()
+                .opacity(keyboardUp ? 0 : 1)
+
+            notesSection
+                .padding(.horizontal, horizontalPadding)
+                .padding(.top, keyboardUp ? 8 : 12)
+                .padding(.bottom, 8)
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .animation(.easeInOut(duration: 0.25), value: activeNote)
+    }
+
+    @ViewBuilder
     private var scrollContent: some View {
+        if isLaptop {
+            laptopContent
+        } else {
+            scrollingContent
+        }
+    }
+
+    private var scrollingContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 Group {
@@ -96,6 +156,7 @@ struct TodayView: View {
                 .padding(.horizontal, horizontalPadding)
                 .padding(.bottom, 32)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
             .onChange(of: focusedJournal) { _, section in
                 guard let section else { return }

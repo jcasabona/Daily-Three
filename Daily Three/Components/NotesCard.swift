@@ -14,6 +14,10 @@ struct NotesCard: View {
     /// Asks the card to put the cursor in its text area (used when a widget's Journal button opens the app).
     var focusRequested: Bool = false
     var onFocusHandled: () -> Void = {}
+    /// Tells the screen when the keyboard comes up for this note, so it can give the note more room.
+    var onFocusChange: (Bool) -> Void = { _ in }
+    /// Stretch the text area to fill the space it's given, instead of a fixed height.
+    var expands: Bool = false
     @FocusState private var isFocused: Bool
     @Environment(\.surfaceStyle) private var style
 
@@ -24,6 +28,9 @@ struct NotesCard: View {
             } else {
                 cardBody
             }
+        }
+        .onChange(of: isFocused) { _, focused in
+            onFocusChange(focused)
         }
         .task(id: focusRequested) {
             guard focusRequested, isEditable else { return }
@@ -39,6 +46,16 @@ struct NotesCard: View {
     private var flatBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             FlatSectionHeader(title: title, theme: theme)
+                .overlay(alignment: .topTrailing) {
+                    // While the note fills the screen there's no scrolling to dismiss the keyboard, so offer a button.
+                    if expands && isFocused {
+                        Button("Done") {
+                            isFocused = false
+                            dismissKeyboard()
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                    }
+                }
 
             if !prompt.isEmpty {
                 Text(prompt)
@@ -49,7 +66,7 @@ struct NotesCard: View {
             if isEditable {
                 TextEditor(text: $text)
                     .focused($isFocused)
-                    .frame(minHeight: 110)
+                    .frame(minHeight: expands ? 0 : 110, maxHeight: expands ? .infinity : nil)
                     .padding(8)
                     .font(.system(size: 15))
                     .scrollContentBackground(.hidden)
@@ -61,7 +78,7 @@ struct NotesCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: expands ? .infinity : nil, alignment: .topLeading)
     }
 
     private var cardBody: some View {

@@ -47,7 +47,8 @@ struct ContentView: View {
     @State private var focusedJournal: JournalSection?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// True while the hinge of a foldable is partly open.
+    @State private var isHalfFolded = false
     #endif
 
     private var todayKey: String {
@@ -90,7 +91,7 @@ struct ContentView: View {
         Binding(get: { selectedTab }, set: { if let tab = $0 { selectedTab = tab } })
     }
 
-    private var sidebar: some View {
+    private func sidebar(width: CGFloat?) -> some View {
         List(selection: sidebarSelection) {
             Section {
                 Label {
@@ -118,12 +119,12 @@ struct ContentView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+        .navigationSplitViewColumnWidth(min: width ?? 180, ideal: width ?? 210, max: width ?? 260)
     }
 
-    private var sidebarContainer: some View {
+    private func sidebarContainer(sidebarWidth: CGFloat?) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            sidebar
+            sidebar(width: sidebarWidth)
         } detail: {
             Group {
                 switch selectedTab {
@@ -200,30 +201,45 @@ struct ContentView: View {
     }
 
     #if os(iOS)
-    /// iPads 11" and up get the Mac's sidebar layout; iPhones and smaller or narrow iPad windows keep the tab bar.
-    private var usesSidebar: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-            && horizontalSizeClass == .regular
-            && shortScreenSide >= 820
-    }
+    /// Windows at least this wide get the Mac's sidebar layout: an iPad 11" or larger, or an open Duo held wide.
+    /// iPhones, smaller iPads and narrow windows keep the tab bar. It reads the window, never the device.
+    private static let sidebarMinWidth: CGFloat = 800
+    private static let sidebarMinHeight: CGFloat = 480
 
-    /// The shorter side of the screen this app is on, whatever size its window is.
-    private var shortScreenSide: CGFloat {
-        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        guard let bounds = scene?.screen.bounds else { return 0 }
-        return min(bounds.width, bounds.height)
+    private func foldPosture(for size: CGSize) -> FoldPosture {
+        #if DEBUG
+        // Lets a simulator, which can't half-fold, show the book and laptop layouts: FORCE_FOLD=book or laptop.
+        if let forced = ProcessInfo.processInfo.environment["FORCE_FOLD"] {
+            return forced == "laptop" ? .laptop : (forced == "book" ? .book : .flat)
+        }
+        #endif
+        return FoldPosture.posture(isHalfFolded: isHalfFolded, windowSize: size)
     }
 
     @ViewBuilder
-    private var mainContainer: some View {
-        if usesSidebar { sidebarContainer } else { tabContainer }
+    private func mainContainer(size: CGSize) -> some View {
+        let posture = foldPosture(for: size)
+        Group {
+            if size.width >= Self.sidebarMinWidth && size.height >= Self.sidebarMinHeight {
+                // In book mode the sidebar takes the whole left half; Today gets the right half.
+                sidebarContainer(sidebarWidth: posture == .book ? size.width / 2 : nil)
+            } else {
+                tabContainer
+            }
+        }
+        .environment(\.foldPosture, posture)
     }
     #else
-    private var mainContainer: some View { sidebarContainer }
+    private func mainContainer(size: CGSize) -> some View { sidebarContainer(sidebarWidth: nil) }
     #endif
 
     var body: some View {
-        mainContainer
+        GeometryReader { proxy in
+            mainContainer(size: proxy.size)
+        }
+        #if os(iOS)
+        .background { HingeReader(isHalfFolded: $isHalfFolded) }
+        #endif
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
