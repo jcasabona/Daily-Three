@@ -45,9 +45,6 @@ struct ContentView: View {
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
     /// Set by the widgets' Journal buttons; Today moves to and focuses that note, then clears it.
     @State private var focusedJournal: JournalSection?
-    /// True until the first-launch wait for iCloud settings finishes, and whether that wait happened at all.
-    @State private var isCheckingSettings = true
-    @State private var waitedForSettings = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -228,17 +225,9 @@ struct ContentView: View {
     var body: some View {
         mainContainer
         .preferredColorScheme(preferredColorScheme)
-        .overlay {
-            if isCheckingSettings && (settings == nil || waitedForSettings) {
-                WelcomeView(theme: currentTheme())
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeOut(duration: 0.3), value: isCheckingSettings)
         .onAppear {
             DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
             AppSettingsDeduplicator.deduplicateIfNeeded(context: modelContext)
-            requestNotificationsIfNeeded()
             writeSnapshotForToday()
             if !router.hasPendingAction {
                 selectedTab = .today
@@ -294,8 +283,14 @@ struct ContentView: View {
                 await syncTodoist()
             }
         }
-        .onChange(of: settings?.themeRaw) { _, _ in
-            showingOnboarding = false
+        // If this device learns (via iCloud) that onboarding was already finished elsewhere, close it. This used to
+        // watch the theme, which also closed onboarding the moment a new user tapped a theme.
+        .onChange(of: settings?.hasCompletedOnboarding) { _, completed in
+            if completed == true { showingOnboarding = false }
+        }
+        // New users are asked once onboarding closes, after they've picked their prompt times and seen why.
+        .onChange(of: showingOnboarding) { wasShowing, isShowing in
+            if wasShowing && !isShowing { requestNotificationsIfNeeded() }
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showingOnboarding) {
@@ -313,11 +308,12 @@ struct ContentView: View {
         }
         #endif
         .task {
-            await waitForSyncedSettings()
             ensureSettings()
             let completedOnboarding = settings?.hasCompletedOnboarding ?? false
             if completedOnboarding {
                 showingOnboarding = false
+                // Someone who is already set up (say, a second device) is asked right away.
+                requestNotificationsIfNeeded()
                 return
             }
 
@@ -341,25 +337,6 @@ struct ContentView: View {
 
     private func bindingForTodayEntry() -> Binding<DayEntry> {
         bindingForEntry(on: Date())
-    }
-
-    /// On a new device the iCloud copy of the settings arrives a few seconds after launch. Wait for it, so we
-    /// don't create a second settings record or show onboarding to someone who is already set up.
-    /// The welcome screen covers the wait, and stays up for at least two seconds so it doesn't flash.
-    private func waitForSyncedSettings() async {
-        guard settings == nil else {
-            isCheckingSettings = false
-            return
-        }
-        waitedForSettings = true
-        let signedIn = FileManager.default.ubiquityIdentityToken != nil
-        // In half-seconds: up to six seconds for iCloud, two without it.
-        for step in 0..<(signedIn ? 12 : 4) {
-            try? await Task.sleep(for: .milliseconds(500))
-            if Task.isCancelled { return }
-            if settings != nil && step >= 3 { break }
-        }
-        isCheckingSettings = false
     }
 
     private func ensureSettings() {
