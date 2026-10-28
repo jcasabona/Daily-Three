@@ -238,7 +238,6 @@ struct ContentView: View {
         .onAppear {
             DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
             AppSettingsDeduplicator.deduplicateIfNeeded(context: modelContext)
-            requestNotificationsIfNeeded()
             writeSnapshotForToday()
             if !router.hasPendingAction {
                 selectedTab = .today
@@ -297,6 +296,10 @@ struct ContentView: View {
         .onChange(of: settings?.themeRaw) { _, _ in
             showingOnboarding = false
         }
+        // New users are asked once onboarding closes, after they've picked their prompt times and seen why.
+        .onChange(of: showingOnboarding) { wasShowing, isShowing in
+            if wasShowing && !isShowing { requestNotificationsIfNeeded() }
+        }
         #if os(iOS)
         .fullScreenCover(isPresented: $showingOnboarding) {
             if let settings {
@@ -318,6 +321,8 @@ struct ContentView: View {
             let completedOnboarding = settings?.hasCompletedOnboarding ?? false
             if completedOnboarding {
                 showingOnboarding = false
+                // Someone who is already set up (say, a second device) gets asked now that the welcome screen is gone.
+                requestNotificationsIfNeeded()
                 return
             }
 
