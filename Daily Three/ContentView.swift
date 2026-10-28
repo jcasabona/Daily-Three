@@ -226,7 +226,6 @@ struct ContentView: View {
         mainContainer
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
-            ensureSettings()
             DayEntryDeduplicator.deduplicateIfNeeded(context: modelContext)
             AppSettingsDeduplicator.deduplicateIfNeeded(context: modelContext)
             requestNotificationsIfNeeded()
@@ -304,6 +303,8 @@ struct ContentView: View {
         }
         #endif
         .task {
+            await waitForSyncedSettings()
+            ensureSettings()
             let completedOnboarding = settings?.hasCompletedOnboarding ?? false
             if completedOnboarding {
                 showingOnboarding = false
@@ -330,6 +331,16 @@ struct ContentView: View {
 
     private func bindingForTodayEntry() -> Binding<DayEntry> {
         bindingForEntry(on: Date())
+    }
+
+    /// On a new device the iCloud copy of the settings arrives a few seconds after launch. Wait for it, so we
+    /// don't create a second settings record or show onboarding to someone who is already set up.
+    private func waitForSyncedSettings() async {
+        guard settings == nil, FileManager.default.ubiquityIdentityToken != nil else { return }
+        for _ in 0..<12 {
+            try? await Task.sleep(for: .milliseconds(500))
+            if settings != nil || Task.isCancelled { return }
+        }
     }
 
     private func ensureSettings() {

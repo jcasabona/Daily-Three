@@ -87,6 +87,34 @@ final class AppSettings {
         set { appearanceModeRaw = newValue.rawValue }
     }
 
+    /// How far this record is from a fresh install. Used to choose which duplicate to keep.
+    var customizationScore: Int {
+        let calendar = Calendar.current
+        func minutes(_ date: Date) -> Int {
+            calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        }
+        var score = 0
+        if hasCompletedOnboarding == true { score += 2 }
+        if themeRaw != ThemeOption.graphite.rawValue { score += 1 }
+        if appearanceModeRaw != AppearanceMode.system.rawValue { score += 1 }
+        if !excludedWeekdaysRaw.isEmpty { score += 1 }
+        if !todoistCreatesTasks { score += 1 }
+        if !todoistProjectID.isEmpty { score += 1 }
+        if minutes(morningTime) != 9 * 60 { score += 1 }
+        if minutes(middayTime) != 12 * 60 { score += 1 }
+        if minutes(eveningTime) != 17 * 60 { score += 1 }
+        return score
+    }
+
+    /// Every field as text, so two records with the same score still sort the same way on every device.
+    var tieBreaker: String {
+        [String(hasCompletedOnboarding ?? false), themeRaw, appearanceModeRaw, excludedWeekdaysRaw,
+         String(todoistCreatesTasks), todoistProjectID, todoistProjectName,
+         String(Int(morningTime.timeIntervalSinceReferenceDate)),
+         String(Int(middayTime.timeIntervalSinceReferenceDate)),
+         String(Int(eveningTime.timeIntervalSinceReferenceDate))].joined(separator: "|")
+    }
+
     init() {
         let calendar = Calendar.current
         let today = Date()
@@ -213,7 +241,9 @@ enum AppSettingsDeduplicator {
         do {
             let all = try context.fetch(FetchDescriptor<AppSettings>())
             guard all.count > 1 else { return }
-            let keeper = all.first(where: { $0.hasCompletedOnboarding == true }) ?? all[0]
+            // Every device must pick the same record, or each deletes the other's and the settings never settle.
+            // Fetch order differs per device, so rank by content: the most customized record wins.
+            guard let keeper = all.max(by: { ($0.customizationScore, $0.tieBreaker) < ($1.customizationScore, $1.tieBreaker) }) else { return }
             for settings in all where settings !== keeper {
                 context.delete(settings)
             }
