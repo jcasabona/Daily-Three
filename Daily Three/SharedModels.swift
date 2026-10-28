@@ -106,6 +106,14 @@ final class AppSettings {
         return score
     }
 
+    /// Orders records by how customized they are, then by their content, the same way on every device.
+    var rank: SettingsRank { SettingsRank(score: customizationScore, tieBreaker: tieBreaker) }
+
+    /// The record to use when more than one exists.
+    static func preferred(in all: [AppSettings]) -> AppSettings? {
+        all.max { $0.rank < $1.rank }
+    }
+
     /// Every field as text, so two records with the same score still sort the same way on every device.
     var tieBreaker: String {
         [String(hasCompletedOnboarding ?? false), themeRaw, appearanceModeRaw, excludedWeekdaysRaw,
@@ -234,6 +242,15 @@ enum DayEntryDeduplicator {
     }
 }
 
+struct SettingsRank: Comparable {
+    let score: Int
+    let tieBreaker: String
+
+    static func < (lhs: SettingsRank, rhs: SettingsRank) -> Bool {
+        (lhs.score, lhs.tieBreaker) < (rhs.score, rhs.tieBreaker)
+    }
+}
+
 enum AppSettingsDeduplicator {
     /// Keeps one AppSettings record, deletes duplicates.
     @MainActor
@@ -243,9 +260,14 @@ enum AppSettingsDeduplicator {
             guard all.count > 1 else { return }
             // Every device must pick the same record, or each deletes the other's and the settings never settle.
             // Fetch order differs per device, so rank by content: the most customized record wins.
-            guard let keeper = all.max(by: { ($0.customizationScore, $0.tieBreaker) < ($1.customizationScore, $1.tieBreaker) }) else { return }
+            guard let keeper = AppSettings.preferred(in: all) else { return }
             for settings in all where settings !== keeper {
-                context.delete(settings)
+                // Only remove a record that is strictly worse. Two records with identical content (two fresh
+                // installs) can't be told apart, so devices would each keep a different one and delete the other,
+                // leaving none. Identical copies are harmless; they resolve as soon as either one is edited.
+                if settings.rank < keeper.rank {
+                    context.delete(settings)
+                }
             }
             if context.hasChanges {
                 try context.save()
