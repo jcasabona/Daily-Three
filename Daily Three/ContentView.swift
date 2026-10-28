@@ -60,7 +60,7 @@ struct ContentView: View {
     }
 
     private var settings: AppSettings? {
-        settingsList.first
+        AppSettings.preferred(in: settingsList)
     }
 
     private var editingMode: DayEditingMode {
@@ -323,6 +323,13 @@ struct ContentView: View {
             }
         }
         #endif
+        // If every settings record disappears while the app is open (a sync can do that), make a new one rather
+        // than leaving Settings spinning until the next launch. The pause lets any synced copy arrive first.
+        .task(id: settingsList.isEmpty) {
+            guard settingsList.isEmpty else { return }
+            try? await Task.sleep(for: .seconds(3))
+            if settingsList.isEmpty { ensureSettings() }
+        }
         .task {
             ensureSettings()
             let completedOnboarding = settings?.hasCompletedOnboarding ?? false
