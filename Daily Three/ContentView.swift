@@ -293,8 +293,10 @@ struct ContentView: View {
                 await syncTodoist()
             }
         }
-        .onChange(of: settings?.themeRaw) { _, _ in
-            showingOnboarding = false
+        // If this device learns (via iCloud) that onboarding was already finished elsewhere, close it. This used to
+        // watch the theme, which also closed onboarding the moment a new user tapped a theme.
+        .onChange(of: settings?.hasCompletedOnboarding) { _, completed in
+            if completed == true { showingOnboarding = false }
         }
         // New users are asked once onboarding closes, after they've picked their prompt times and seen why.
         .onChange(of: showingOnboarding) { wasShowing, isShowing in
