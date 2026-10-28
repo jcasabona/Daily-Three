@@ -347,19 +347,17 @@ struct ContentView: View {
     /// don't create a second settings record or show onboarding to someone who is already set up.
     /// The welcome screen covers the wait, and stays up for at least two seconds so it doesn't flash.
     private func waitForSyncedSettings() async {
-        guard settings == nil else {
-            isCheckingSettings = false
-            return
-        }
+        // Always lift the welcome screen, even if SwiftUI cancels this task partway through.
+        defer { isCheckingSettings = false }
+        guard settings == nil else { return }
         waitedForSettings = true
         let signedIn = FileManager.default.ubiquityIdentityToken != nil
         // In half-seconds: up to six seconds for iCloud, two without it.
         for step in 0..<(signedIn ? 12 : 4) {
-            try? await Task.sleep(for: .milliseconds(500))
-            if Task.isCancelled { return }
+            // An unstructured sleep, so a cancelled SwiftUI task doesn't skip the wait.
+            await Task { try? await Task.sleep(for: .milliseconds(500)) }.value
             if settings != nil && step >= 3 { break }
         }
-        isCheckingSettings = false
     }
 
     private func ensureSettings() {
